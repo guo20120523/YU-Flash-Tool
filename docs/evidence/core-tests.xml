@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.yu.flash.core.SafetyTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-10-01T03:43:46" hostname="redacted" time="2.985">
+  <properties/>
+  <testcase name="changedTargetBeforeWriteStopsTransaction" classname="io.yu.flash.core.SafetyTest" time="1.218"/>
+  <testcase name="auditFailureNeverPermitsWritingAndReleasesGate" classname="io.yu.flash.core.SafetyTest" time="0.304"/>
+  <testcase name="mergedDisplayAliasesDoNotChangeStableTarget" classname="io.yu.flash.core.SafetyTest" time="0.003"/>
+  <testcase name="unknownAndDangerousEnvironmentsFailClosed" classname="io.yu.flash.core.SafetyTest" time="0.176"/>
+  <testcase name="mountedMappedDataAndUnknownTargetsFailClosed" classname="io.yu.flash.core.SafetyTest" time="0.091"/>
+  <testcase name="cancellationConfirmationDoesNotWrite" classname="io.yu.flash.core.SafetyTest" time="0.054"/>
+  <testcase name="imageSignaturesAreContentBased" classname="io.yu.flash.core.SafetyTest" time="0.002"/>
+  <testcase name="successfulFileSimulationIsOrderedAndBackedUp" classname="io.yu.flash.core.SafetyTest" time="0.165"/>
+  <testcase name="typedNameMustMatchExactly" classname="io.yu.flash.core.SafetyTest" time="0.024"/>
+  <testcase name="changedStagingStopsTransaction" classname="io.yu.flash.core.SafetyTest" time="0.037"/>
+  <testcase name="wrongLengthAndTypeAreRejected" classname="io.yu.flash.core.SafetyTest" time="0.025"/>
+  <testcase name="syncErrorIsFailure" classname="io.yu.flash.core.SafetyTest" time="0.082"/>
+  <testcase name="existingNormalizedImageIsNotOverwritten" classname="io.yu.flash.core.SafetyTest" time="0.076"/>
+  <testcase name="noQualifiedDeviceCanNeverWrite" classname="io.yu.flash.core.SafetyTest" time="0.058"/>
+  <testcase name="writeErrorDoesNotRetry" classname="io.yu.flash.core.SafetyTest" time="0.131"/>
+  <testcase name="changedSlotStopsTransaction" classname="io.yu.flash.core.SafetyTest" time="0.071"/>
+  <testcase name="backupFailureStopsWrite" classname="io.yu.flash.core.SafetyTest" time="0.047"/>
+  <testcase name="emptyTruncatedSparseAndDisguisedImagesFail" classname="io.yu.flash.core.SafetyTest" time="0.079"/>
+  <testcase name="readbackMismatchIsFailure" classname="io.yu.flash.core.SafetyTest" time="0.091"/>
+  <testcase name="doubleTapDoesNotQueueSecondTask" classname="io.yu.flash.core.SafetyTest" time="0.09"/>
+  <testcase name="backupVerificationFailureStopsWrite" classname="io.yu.flash.core.SafetyTest" time="0.06"/>
+  <testcase name="cancellationWhileBackingUpNeverWrites" classname="io.yu.flash.core.SafetyTest" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
