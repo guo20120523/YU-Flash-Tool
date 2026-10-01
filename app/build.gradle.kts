@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application") version "8.9.2"
-    kotlin("android") version "2.1.20"
+    kotlin("android") // version supplied by the root Kotlin plugin classpath
     id("org.jetbrains.kotlin.plugin.compose")
 }
 android {
