@@ -4,11 +4,11 @@
 
 ## 当前交付与证据状态
 
-本指南描述**已写入工程的构建配置及后续操作步骤**，不是成功构建报告。当前没有仓库 Actions 运行记录、已交付 APK、Android 编译/Lint 通过记录或真机结果。本地核心主/测试源码已编译，直接 JUnitCore 运行 22 项通过；Gradle `:core:test` 曾因参数编码导致工作进程启动失败，匹配本机编码后 **22 项通过，退出码 0**；不是 Android 整体构建成功。详见[验证记录](<VERIFICATION.md>)。
+GitHub [运行 36814142454](https://github.com/guo20120523/YU-Flash-Tool/actions/runs/36814142454) 已成功：22 项核心测试通过，Android Lint 0 错误/23 警告，Debug APK 与仪器测试 APK 编译完成。构建提交为 `a3bf9ac6ebf1a7d5fe5d0427e2e95fa13772844f`。没有模拟器或真机运行结果，真实写入关闭。详见[验证记录](<VERIFICATION.md>)。
 
 ## 1. 将项目内容上传到仓库根目录
 
-使用您自己创建或有权限使用的 GitHub 仓库；这里没有预设仓库地址。
+已建立公开源码仓库：[guo20120523/YU-Flash-Tool](https://github.com/guo20120523/YU-Flash-Tool)。以下上传说明也适用于您自己的 Fork。
 
 上传 `YU-Flash-Tool` 目录**里面的内容**，而不是让仓库根目录再套一层 `YU-Flash-Tool` 文件夹。需要保留隐藏目录 `.github`。特别检查上传工具是否遗漏点开头的目录。根目录应直接包含以下文件及目录：
 
@@ -47,7 +47,7 @@
 成功运行后，在该次运行页面的 Artifacts 中查找：
 
 - `YU-Flash-Tool-verification`：配置收集核心测试 HTML/XML 报告与 Android Debug Lint 报告。失败发生太早时可能不存在部分报告；上传步骤执行过不等于测试通过。
-- `YU-Flash-Tool-debug-apk`：预期包含 `app/build/outputs/apk/debug/app-debug.apk`。这是未来成功运行后的输出路径，**当前没有此 APK 交付**。
+- `YU-Flash-Tool-debug-apk`：成功构建才上传，包含 `YU-Flash-Tool-debug.apk`、对应提交的源码 ZIP、`SHA256SUMS.txt`、`BUILD-INFO.txt` 以及许可材料。下载后应校验摘要并保留对应源码。
 
 下载前记录提交标识、运行编号、任务结论、22 个当前测试方法的实际执行/失败/跳过数量及 Lint 结果。测试数量可能随源码变化，应以对应提交的报告为准。Debug APK 仅用于受控验证，不是发布签名包，不构成真机安全认证。安装后也不会开放真实写入。
 

@@ -8,9 +8,9 @@
 - **计划／未执行**：需要补充自动化、Android 仪器测试或受控真机操作，当前没有结果。
 - **静态核对**：仅阅读源码确认设计，不替代运行测试。
 
-当前[SafetyTest](<../core/src/test/kotlin/io/yu/flash/core/SafetyTest.kt>)共有 **22 个 `@Test` 方法**，本次直接 JUnitCore 运行全部通过，但不是完整覆盖证明。以下分类数不等于测试方法数：一方法可能覆盖多个输入，一个类别也可能需要多个新测试。没有 APK、Android 编译/Lint 通过、UI/仪器或真机证据；GitHub 工作流尚无仓库运行记录。各次本地验证的失败与通过结果分开记录；后续 Gradle 成功不抹除先前编码故障。
+当前[SafetyTest](<../core/src/test/kotlin/io/yu/flash/core/SafetyTest.kt>)共有 **22 个 `@Test` 方法**，本次直接 JUnitCore 运行全部通过，但不是完整覆盖证明。以下分类数不等于测试方法数：一方法可能覆盖多个输入，一个类别也可能需要多个新测试。GitHub 运行 36814142454 已通过核心测试及 Android 编译/Lint，并生成 APK；Lint 为 0 错误/23 警告。仍无 UI/仪器执行或真机证据。各次本地验证的失败与通过结果分开记录；后续 Gradle 成功不抹除先前编码故障。
 
-另有 [UiSmokeTest](<../app/src/androidTest/java/io/yu/flash/UiSmokeTest.kt>) 的 3 个 Android 冒烟测试源码：首次进入不自动授权 Root、四页面导航与开发者信息、Activity 重建。**均未编译/未运行**。CI 配置编译仪器测试 APK，但不启动模拟器、不执行仪器测试。
+另有 [UiSmokeTest](<../app/src/androidTest/java/io/yu/flash/UiSmokeTest.kt>) 的 3 个 Android 冒烟测试源码：首次进入不自动授权 Root、四页面导航与开发者信息、Activity 重建。**均已编译/未运行**。CI 配置编译仪器测试 APK，但不启动模拟器、不执行仪器测试。
 
 ## 分类别矩阵
 
@@ -51,7 +51,7 @@
 | 33 | 前台服务与生命周期 | 计划／未执行 | 后台、划除任务、进程死亡、重启、通知拒绝、Android 15 超时；未完成任务标中断，不自动续跑 |
 | 34 | 日志、导出及清理 | 计划／未执行 | 最新最多 1000 条事件、脱敏字段、导出失败、卸载；清理暂存不删备份，忙碌期拒绝清理 |
 | 35 | 硬件写入永久拦截 | 静态核对；运行验证计划／未执行 | 即使 UI/核心被错误调用，当前 `RootDeviceAccess.write()` 仍抛错；不得以破坏拦截作设备测试 |
-| 36 | Android 构建与 GitHub 证据 | 计划／未执行 | SDK35 检查、`:core:test :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest`，只在成功后上传 APK |
+| 36 | Android 构建与 GitHub 证据 | Actions 36814142454 已通过；Lint 23 警告 | SDK35 检查、`:core:test :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest`，只在成功后上传 APK |
 | 37 | AVB、快照、非 A/B 与恢复 | 未支持；相关拒绝验证计划／未执行 | 无适配即拒绝；没有回滚/恢复/AVB 绕过能力，不以普通文件测试替代硬件证据 |
 
 ## 证据记录模板
@@ -62,7 +62,7 @@
 
 ## 发布前最低验收
 
-1. 已取得本地直接 JUnitCore 22 项通过输出；仍需在 GitHub 取得 Gradle 测试报告并复核对应提交。
-2. 在真实仓库运行[构建工作流](<../.github/workflows/android.yml>)并保留 Lint 和 APK 构建证据。
+1. 已取得本地与 GitHub 22 项核心测试通过证据，对应提交见[验证记录](<VERIFICATION.md>)。
+2. 已取得[构建工作流](<../.github/workflows/android.yml>)的 Lint 与 APK 编译证据；23 项 Lint 警告仍待评估，不是零警告验收。
 3. 受控验证读取/导入、Root 异常、生命周期、空间和提交故障，维持真实写入关闭。
 4. 完成隐私与许可材料核对。若未来计划开放真实写入，另行审核设备适配、断电影响和恢复方案，不能沿用本预览版结论。

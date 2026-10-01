@@ -2,7 +2,7 @@
 
 面向 Android 的本地分区发现、受限 Root 备份与镜像检查工程。开发者：昱yu；QQ：3895958954。当前版本配置为 `0.1.0-safety-preview`，API 26 为最低版本，编译及目标 API 为 35；这只是设计/构建配置范围，**不是已验证设备兼容清单**。
 
-> **尚未交付完整真实刷写能力。** 已有实际 Root 块设备读取备份代码、系统文档选择器（SAF）本地普通文件导入代码，但未提供 APK、Android 编译通过记录或真机结果。核心主/测试源码已编译，直接 JUnitCore 运行 **22 项测试全部通过**。本机 Gradle 测试执行器曾因参数文件编码失败，使用本机匹配编码后 **`:core:test` 22 项全部通过**，已有标准 XML 报告；这不是 Android 整体构建通过。另有 3 项未运行 UI 冒烟测试。详见[真实验证记录](<docs/VERIFICATION.md>)。
+> **尚未交付完整真实刷写能力。** GitHub Actions 已成功编译 Debug APK、仪器测试 APK，并通过 Android Lint 和 **22 项核心测试**：[成功运行与产物](https://github.com/guo20120523/YU-Flash-Tool/actions/runs/36814142454)，对应提交 `a3bf9ac6ebf1a7d5fe5d0427e2e95fa13772844f`。3 项 UI 冒烟测试仅编译、未执行；Root 备份、SAF 与生命周期未真机验证。真实分区写入仍关闭。详见[真实验证记录](<docs/VERIFICATION.md>)。
 
 ## 开源许可
 
@@ -24,7 +24,7 @@
 
 ## 文档导航
 
-- [GitHub 构建指南](<docs/BUILD.md>)：把项目**内容**上传到仓库根目录，保留隐藏目录 `.github`，再运行现有工作流。当前没有仓库运行记录。
+- [GitHub 构建指南](<docs/BUILD.md>)：把项目**内容**上传到仓库根目录，保留隐藏目录 `.github`，再运行现有工作流；已有成功运行及配套产物。
 - [用户指南](<docs/USER_GUIDE.md>)：Root、筛选、备份、镜像检查、任务记录与隐私。
 - [安全设计](<docs/SAFETY_DESIGN.md>)：默认拒绝原则、事务边界、残余风险。
 - [测试矩阵](<docs/TEST_MATRIX.md>)：区分已写单元模拟、待执行计划、尚无设备证据。

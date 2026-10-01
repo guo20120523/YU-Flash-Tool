@@ -11,12 +11,12 @@
 | Gradle Wrapper | 8.11.1 生成成功；分发包 SHA-256 已固定 |
 | Gradle `:core:test` | **22 项通过，退出码 0**：使用匹配本机编码的参数后成功；先前失败保留在下文 |
 | 直接 JUnitCore 运行已编译测试 | **22 项通过，退出码 0**；普通临时文件/假设备模拟 |
-| Android app / Lint / 测试 APK 编译 | **未执行**；按用户选择交给 GitHub，未安装本地 SDK |
-| Android UI 冒烟测试 | 已写 3 项，**未编译、未运行** |
+| Android app / Lint / 测试 APK 编译 | **GitHub Actions 通过**，见下方运行五；本地未安装 SDK |
+| Android UI 冒烟测试 | 已写 3 项，**已编译、未运行** |
 | Root、备份、SAF、生命周期真机测试 | **未执行** |
 | 真实刷写 | **不支持 / 未执行**；适配注册表为空，硬件写入方法直接拒绝 |
-| GitHub Actions | 已配置，**未上传仓库、未运行** |
-| APK | **没有生成或交付** |
+| GitHub Actions | 公开仓库已建立；运行 **36814142454 成功** |
+| APK | 已生成 Debug 安全预览版，与对应源码及 SHA-256 一并上传 Actions artifact |
 
 ## 环境
 
@@ -98,9 +98,23 @@ gradle -PcoreOnly=true :core:test "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encodin
 - 常见许可资源改为合并保留而不是排除；仍未验证最终 APK 的许可材料完整性。
 - 静态交付检查退出码 0：7 份交付文档的相对链接均可解析；Manifest 无 INTERNET 权限；真实写入拒绝代码存在。该检查不是 Android 编译或运行验证。
 
+## 运行五：GitHub Android 构建成功
+
+- 公开仓库：https://github.com/guo20120523/YU-Flash-Tool
+- 成功运行：https://github.com/guo20120523/YU-Flash-Tool/actions/runs/36814142454
+- 构建提交：`a3bf9ac6ebf1a7d5fe5d0427e2e95fa13772844f`。本节是构建后的文档补记，APK 对应源码以 artifact 内源码 ZIP 为准。
+- `:core:test` XML：22 tests，0 skipped，0 failures，0 errors，0.215 秒；核心 Gradle 步骤 46 秒成功。
+- `:app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest`：2 分 40 秒成功。3 项 UI 测试只编译，未执行。
+- Lint：**0 错误、23 警告**，包括目标 API 不是最新、明确限定的 `/sdcard` 路径、依赖更新提示、DataExtractionRules、UsableSpace 和缺少应用图标；不是零警告验收。
+- 两次前置失败保留：运行 36813532143 为 Kotlin 插件重复版本；36813836827 为根/子项目插件类加载器隔离导致 `com/android/build/gradle/api/BaseVariant` 缺失。统一根插件 classpath 后成功。
+- APK SHA-256：`88f2780d942a24e12127c2d921663d310816c33d358f31ec3f8fd958ad1028af`。
+- 对应源码 ZIP SHA-256：`4bfbd9e949aa24b0a1b8b688883d63ced76615c1383e01dfc611b5e5807bfdf1`。
+- 下载构建 artifact 摘要与 GitHub API 一致：`94c004531b20ef35fd8138bd4f3abe3e873e95f19ab735104ca1f638884ddd9f`；验证报告 artifact：`3a3edb7a2527793c949aca40618f15435b3aadea5550c6ca031020869b305ddc`。
+- 仅 Debug 安全预览；未安装、未真机测试，真实分区写入保持关闭。未宣称签名独立验证或完整传递许可证审计。
+
 ## 后续最低验证
 
-1. 在用户自己的仓库运行现有 GitHub Actions，取得 `:core:test`、Android Lint、Debug APK、仪器测试 APK 编译证据。
+1. 持续保留每个发布提交对应的核心测试、Lint、APK 和源码证据；上述构建已经完成。
 2. 在模拟器执行 3 项 UI 冒烟测试；再补足字体、折叠、状态保持、服务与故障注入测试。
 3. 对 Root、真实读取、SAF 提供器和备份提交协议做受控设备验证；**保持真实写入关闭**。
 4. 补齐第三方许可全文与实际解析依赖清单。不要把此记录宣传为“完整工程已全部验收”。
