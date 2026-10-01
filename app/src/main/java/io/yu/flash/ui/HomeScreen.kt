@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -52,7 +53,13 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
             (risk == "全部" || p.risk.name == risk) && (!readable || runCatching { SafetyPolicy.backup(p) }.isSuccess) &&
             (settings.showHighRisk || p.risk == Risk.BOOT_CHAIN)
     }.let { list -> when (sort) { "大小" -> list.sortedByDescending { it.bytes }; "类型" -> list.sortedBy { it.kind.name }; else -> list.sortedBy { it.name } } }
-    Column(Modifier.fillMaxSize().padding(horizontal = Spacing.medium)) {
+    // One vertical lazy list: short/watch displays can scroll past all controls.
+    // Table rows share the same horizontal offset; no nested vertical list or weight.
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().testTag("home-scroll"),
+        contentPadding = PaddingValues(horizontal = Spacing.medium, vertical = Spacing.small)
+    ) {
+        item(key = "overview") { Column {
         Text("分区", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = Spacing.small))
         Text("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}\nRoot：${home.root} · 当前槽位：${home.environment?.slot ?: "未知"}", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
@@ -61,24 +68,36 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
         if (home.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在只读检查 Root、工具和分区，请等待授权…") }
         home.error?.let { WarningCard(it) }
         if (settings.verbose) Text(home.diagnostics, style = MaterialTheme.typography.bodySmall)
+        } }
         if (home.root != RootState.READY) {
+            item(key = "authorization-help") { Column {
             Text(home.diagnostics, Modifier.padding(vertical = Spacing.medium))
             Text("授权前不执行 su。若授权超时请检查 Root 管理器；无 Root 时仍可查看设置与历史任务。")
+            } }
         } else {
+            item(key = "search") {
             OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("搜索分区名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            }
+            item(key = "filters") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
                 ChoiceMenu("排序：$sort", listOf("名称", "大小", "类型")) { sort = it }
                 ChoiceMenu("槽位：$slot", listOf("全部", "a", "b", "无/未知")) { slot = it }
                 ChoiceMenu("风险：$risk", listOf("全部") + Risk.entries.map { it.name }) { risk = it }
                 FilterChip(selected = readable, onClick = { readable = !readable }, label = { Text("仅可读取") })
             }
-            if (rows.isEmpty()) Text(if (home.partitions.isEmpty()) "未发现有效分区，请展开诊断。" else "没有匹配筛选条件的分区。")
-            // ONE scroll container wraps both header and list, preserving five-column alignment.
-            Column(Modifier.weight(1f).horizontalScroll(horizontal).width(840.dp)) {
-                TableRow { column -> Text(listOf("分区名称", "分区大小", "文件格式", "读取", "写入")[column], style = MaterialTheme.typography.labelLarge) }
-                HorizontalDivider()
-                LazyColumn {
-                    items(rows, key = { it.identity }) { partition ->
+            }
+            if (rows.isEmpty()) item(key = "empty") {
+                Text(if (home.partitions.isEmpty()) "未发现有效分区，请展开诊断。" else "没有匹配筛选条件的分区。")
+            }
+            item(key = "table-hint") { Text("上下滑动浏览全部内容；左右滑动分区表查看五列。", style = MaterialTheme.typography.bodySmall) }
+            item(key = "table-header") {
+                Column(Modifier.fillMaxWidth().horizontalScroll(horizontal).width(840.dp)) {
+                    TableRow { column -> Text(listOf("分区名称", "分区大小", "文件格式", "读取", "写入")[column], style = MaterialTheme.typography.labelLarge) }
+                    HorizontalDivider()
+                }
+            }
+            items(rows, key = { "partition:${it.identity}" }) { partition ->
+                Column(Modifier.fillMaxWidth().horizontalScroll(horizontal).width(840.dp).testTag("partition-row:${partition.identity}")) {
                         TableRow(compact = settings.compact) { column -> when (column) {
                             0 -> TextButton(onClick = { detail = partition }) { Text(partition.name) }
                             1 -> TextButton(onClick = { detail = partition }) { Text(capacity(partition.bytes, settings.binaryUnits)) }
@@ -90,10 +109,11 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
                                 modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，仅检查，真实写入受阻" }) { Text("写入检查") }
                         } }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
                 }
             }
-            TextButton(onClick = { vm.message.value = home.diagnostics }) { Text("查看检测诊断 · 写入受安全限制") }
+            item(key = "diagnostics") {
+                TextButton(onClick = { vm.message.value = home.diagnostics }) { Text("查看检测诊断 · 写入受安全限制") }
+            }
         }
     }
     detail?.let { p -> AlertDialog(onDismissRequest = { detail = null }, title = { Text(p.name) }, text = {

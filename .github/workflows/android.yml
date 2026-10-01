@@ -47,13 +47,44 @@ jobs:
           set -euo pipefail
           mkdir -p deliverables
           cp app/build/outputs/apk/debug/app-debug.apk deliverables/YU-Flash-Tool-debug.apk
+          cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk deliverables/YU-Flash-Tool-androidTest.apk
+          zip -r deliverables/YU-Flash-Tool-verification.zip core/build/reports/tests core/build/test-results app/build/reports/lint-results-debug.*
           git archive --format=zip --output=deliverables/YU-Flash-Tool-source.zip HEAD
           printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nType: debug safety preview; hardware writing disabled\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > deliverables/BUILD-INFO.txt
           cp LICENSE THIRD_PARTY_NOTICES.md deliverables/
-          (cd deliverables && sha256sum YU-Flash-Tool-debug.apk YU-Flash-Tool-source.zip > SHA256SUMS.txt)
+          python3 scripts/release_notes.py
+          (cd deliverables && sha256sum *.apk *.zip BUILD-INFO.txt LICENSE THIRD_PARTY_NOTICES.md RELEASE-NOTES.md > SHA256SUMS.txt)
       - name: Upload APK and matching source (only after successful checks)
         uses: actions/upload-artifact@v4
         with:
           name: YU-Flash-Tool-debug-apk
           path: deliverables/
           if-no-files-found: error
+
+  publish-release:
+    needs: verify-and-build
+    # Never publish PR code or an arbitrary branch; grant write only to this job.
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: YU-Flash-Tool-debug-apk
+          path: deliverables
+      - name: Publish immutable per-run preview with detailed notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd deliverables && sha256sum --check SHA256SUMS.txt)
+          tag="preview-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          # Create as draft so incomplete uploads are not advertised as a release.
+          gh release create "$tag" deliverables/* \
+            --target "$GITHUB_SHA" --draft --prerelease \
+            --title "YU-Flash-Tool 安全预览 · 构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
+            --notes-file deliverables/RELEASE-NOTES.md
+          gh release edit "$tag" --draft=false
