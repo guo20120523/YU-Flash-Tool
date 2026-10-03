@@ -2,6 +2,8 @@
 
 [返回首页](<../README.md>) · [构建指南](<BUILD.md>) · [安全设计](<SAFETY_DESIGN.md>)
 
+> 本表保留早期工程的测试设计与证据基线；下文方法数量、运行编号及状态均属于该基线，不是最新版本状态摘要。后续发布的实际测试结果与新增覆盖统一在对应 [Releases 页面](https://github.com/guo20120523/YU-Flash-Tool/releases)及附件报告中说明；调整测试设计时才更新矩阵，不为每次构建重复改写。
+
 ## 状态约定
 
 - **单元模拟通过（JUnitCore）**：核心主/测试源码由 Gradle 编译，直接 JUnitCore 运行 22 项通过；只操作普通文件与 `FakeDevice`。本机 Gradle `:core:test` 匹配本机参数编码后也已 22 项通过，标准报告无失败/跳过；不能混同为 Android 整体通过。详见[验证记录](<VERIFICATION.md>)。

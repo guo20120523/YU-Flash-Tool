@@ -1,10 +1,12 @@
-# 本次验证记录
+# 历史验证记录
 
 [返回首页](<../README.md>) · [测试矩阵](<TEST_MATRIX.md>) · [构建说明](<BUILD.md>)
 
-## 范围与结论
+> 本文件保留早期工程建立、环境排障和指定提交的验证证据，不作为最新版本状态页，后续发布不在此重复维护。下文“当前”“本次”等用语均指各段记录时的状态。各版本的新变化、验证结果及已知问题统一查看对应 [Releases 页面](https://github.com/guo20120523/YU-Flash-Tool/releases)。
 
-| 项目 | 本次真实结果 |
+## 历史范围与结论
+
+| 项目 | 归档时的真实结果 |
 | --- | --- |
 | JVM 主源码编译 | Gradle `:core:compileKotlin` 成功 |
 | JVM 测试源码编译 | Gradle `:core:compileTestKotlin` 成功 |

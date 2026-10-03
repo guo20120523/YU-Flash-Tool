@@ -1,6 +1,6 @@
 # 文档中心
 
-[项目首页](<../README.md>) · [下载预发布](https://github.com/guo20120523/YU-Flash-Tool/releases) · [问题反馈](https://github.com/guo20120523/YU-Flash-Tool/issues)
+[项目首页](<../README.md>) · [下载与发行说明](https://github.com/guo20120523/YU-Flash-Tool/releases) · [问题反馈](https://github.com/guo20120523/YU-Flash-Tool/issues)
 
 ## 我应该先看哪份文档？
 
@@ -10,10 +10,10 @@
 | 授权 Root、备份或检查镜像 | [用户指南](<USER_GUIDE.md>) | 每一步操作、目录与空间、结果判读、日志及隐私 |
 | 理解为什么拒绝操作 | [安全设计](<SAFETY_DESIGN.md>) | 保守策略、目标身份、事务与残余风险 |
 | 自己构建与发布 | [构建说明](<BUILD.md>) | 工具版本、核心测试、Android 编译、Actions 与 Releases |
-| 核对哪些已经测试 | [验证记录](<VERIFICATION.md>) | 真实成功/失败运行、对应提交、报告与边界 |
-| 查覆盖项与缺口 | [测试矩阵](<TEST_MATRIX.md>) | 普通文件模拟、UI 编译、设备待验证类别 |
-| 查看版本演进 | [更新记录](<../CHANGELOG.md>) | 应用版本、发布标签、功能变化和未完成项 |
-| 准备下一次发布介绍 | [发布说明源文档](<RELEASE_NOTES.md>) | 当前版本功能变化、安装提醒与已知问题；CI 追加实际统计 |
+| 核对某个版本的实际结果 | [Releases](https://github.com/guo20120523/YU-Flash-Tool/releases) | 对应版本的提交、验证报告、已知问题和附件 |
+| 查测试设计与早期证据 | [测试矩阵](<TEST_MATRIX.md>) / [历史验证记录](<VERIFICATION.md>) | 覆盖类别、工程排障与已记录的历史运行；不是最新版本状态页 |
+| 查看版本变化 | [Releases](https://github.com/guo20120523/YU-Flash-Tool/releases) | 功能更新、修复记录与安装提醒的统一入口 |
+| 准备下一次发布介绍 | [发行说明源文档](<RELEASE_NOTES.md>) | 维护者填写本次变化及已知问题，CI 追加实际统计 |
 | 确认授权与第三方依赖 | [GPL v3](<../LICENSE>) / [第三方声明](<../THIRD_PARTY_NOTICES.md>) | 原创源码授权、上游材料及审核待办 |
 
 ## 如何理解验证用语
@@ -28,4 +28,6 @@
 
 ## 文档与产物版本
 
-仓库主分支文档可能比某个 APK 更新。安装和排障时以该 Release 的完整提交、发布说明、对应源码及校验文件为准；历史构建不因后续文字修订而变成新二进制。本次文档整理不更改应用代码。
+项目首页和通用指南不维护逐版本更新列表。功能变化、修复、已知问题与构建结果统一写在 Releases；发行说明源文档是发布流程的输入，不是另一份累积更新日志。
+
+仓库主分支文档可能比某个 APK 更新。安装和排障时以该 Release 的完整提交、发布说明、对应源码及校验文件为准；历史构建不因后续文字修订而变成新二进制。

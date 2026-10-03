@@ -2,9 +2,9 @@
 
 [返回首页](<../README.md>) · [测试矩阵](<TEST_MATRIX.md>)
 
-## 当前交付与证据状态
+## 构建结果在哪里查看
 
-当前 0.1.1 对应 [运行 36817798625](https://github.com/guo20120523/YU-Flash-Tool/actions/runs/36817798625)，提交 `5b3b01e9c44b8301d352188b95beb4f0a1ed1036`：22 项核心测试通过，Lint 0 错误/23 警告，主/测试 APK 编译成功，并自动发布 [preview-4-1](https://github.com/guo20120523/YU-Flash-Tool/releases/tag/preview-4-1)。4 项 UI 测试只编译未执行；用户手表反馈不是完整独立设备验收。真实写入关闭。历史记录见[验证记录](<VERIFICATION.md>)。
+本指南说明工具链、构建步骤与发布流程，不维护某次构建的结果快照。各版本的提交标识、APK、源码、测试与 Lint 结果以对应 [Releases 页面](https://github.com/guo20120523/YU-Flash-Tool/releases)及其附件为准。早期环境排障可查阅[历史验证记录](<VERIFICATION.md>)；历史成功不等于当前提交或设备验收通过。
 
 ## 1. 将项目内容上传到仓库根目录
 
@@ -52,7 +52,7 @@
 
 成功的主分支构建还会在 [Releases](https://github.com/guo20120523/YU-Flash-Tool/releases) 创建 `preview-<运行序号>-<尝试次数>` 独立预发布，便于直接下载，无需只依赖有保存期限的 Actions artifact。发布说明由[说明源文档](<RELEASE_NOTES.md>)与[生成脚本](<../scripts/release_notes.py>)组合，附该次真实测试/Lint统计、提交和附件哈希。维护者每次功能更新须同步说明源文档，不能把自动统计误当成自动生成完整功能变更。
 
-下载前记录提交标识、运行编号、任务结论、22 个当前测试方法的实际执行/失败/跳过数量及 Lint 结果。测试数量可能随源码变化，应以对应提交的报告为准。Debug APK 仅用于受控验证，不是发布签名包，不构成真机安全认证。安装后也不会开放真实写入。
+下载前记录提交标识、运行编号、任务结论、测试实际执行/失败/跳过数量及 Lint 结果。测试数量可能随源码变化，应以对应提交的报告为准。Debug APK 仅用于受控验证，不是发布签名包，不构成真机安全认证。安装后也不会开放真实写入。
 
 ## 4. 本地构建（可选，前置工具已具备时）
 
@@ -81,7 +81,7 @@ gradle -PcoreOnly=true :core:test --no-daemon --console=plain
 gradle -PcoreOnly=true :core:test "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK" --no-daemon --console=plain
 ```
 
-此命令仍需要 JDK、Gradle 及核心依赖；**核心测试成功也不能证明 Android 编译或硬件行为正确**。构建任务只编译 Android 仪器测试 APK，不执行当前 4 个 UI 测试（3 个冒烟测试及 1 个小视口回归测试），也不执行真机测试。要运行仪器测试，须另有模拟器或设备并执行 `gradle :app:connectedDebugAndroidTest`；测试不申请 Root、不执行设备读取或写入。
+此命令仍需要 JDK、Gradle 及核心依赖；**核心测试成功也不能证明 Android 编译或硬件行为正确**。构建任务只编译 Android 仪器测试 APK，不执行其中的 UI 测试，也不执行真机测试。要运行仪器测试，须另有模拟器或设备并执行 `gradle :app:connectedDebugAndroidTest`；测试不申请 Root、不执行设备读取或写入。
 
 ## 5. 常见失败的解释
 
