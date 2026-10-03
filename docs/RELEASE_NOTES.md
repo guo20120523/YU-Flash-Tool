@@ -7,7 +7,7 @@
 ### 1. 增加真实、单目标的受限写入链路
 
 - 新增 Java `RootWriter`，由已安装 APK 内代码通过 Root `app_process` 启动，不是任意 Shell 或任意写入二进制入口。
-- 目标以 `O_RDWR | O_EXCL | O_NOFOLLOW` 打开，并设置 close-on-exec（API 27+ 使用 `O_CLOEXEC`；API 26 在启动助手子进程前通过 `fcntl(F_SETFD, FD_CLOEXEC)` 设置）；固定同一个设备 FD，贯穿原目标全量哈希、完整写入、`fsync` 和全量 SHA-256 读回，避免在阶段之间重新解析并打开目标路径。
+- 目标以 `O_RDWR | O_EXCL | O_NOFOLLOW` 打开，并设置 close-on-exec（API 27+ 使用公开的 `O_CLOEXEC`；API 26 使用 Android 8 bionic 已定义的同一内核标志值 `0x80000`，不调用后续 API 或反射隐藏接口）；固定同一个设备 FD，贯穿原目标全量哈希、完整写入、`fsync` 和全量 SHA-256 读回，避免在阶段之间重新解析并打开目标路径。
 - 核对固定 FD 的块设备类型、设备号、容量与 sysfs 绑定；重新检查真实物理分区、只读/映射/holders/slaves、可读进程挂载命名空间与 swap 状态。必要信息无法确定则拒绝。
 - 新增共享核心引擎 `VerifiedCopy`：先验源哈希与原目标全量备份哈希，输出首字节前同步写入阶段，处理合法短读/短写，对零进展、提前 EOF、同步/读回错误或哈希不符直接失败。
 - 仅在完整读回且源/目标描述符关闭后，助手发出精确 token/身份/长度/哈希回执。应用核对回执后记录结果，**不把成功描述为可启动**。

@@ -18,10 +18,9 @@ internal class WriteInterlock(private val directory: File) {
     }
     private fun syncDirectory() {
         // O_DIRECTORY is not exposed by the public Android SDK. Validate the opened FD instead.
-        val closeOnExec = if (android.os.Build.VERSION.SDK_INT >= 27) OsConstants.O_CLOEXEC else 0
+        val closeOnExec = if (android.os.Build.VERSION.SDK_INT >= 27) OsConstants.O_CLOEXEC else RootWriter.API26_O_CLOEXEC
         val fd = Os.open(directory.path, OsConstants.O_RDONLY or OsConstants.O_NOFOLLOW or closeOnExec, 0)
         try {
-            Os.fcntlInt(fd, OsConstants.F_SETFD, OsConstants.FD_CLOEXEC)
             requireSafe(OsConstants.S_ISDIR(Os.fstat(fd).st_mode), "互锁父目录不是目录，拒绝写入")
             Os.fsync(fd)
         } finally { Os.close(fd) }

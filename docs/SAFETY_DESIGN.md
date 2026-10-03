@@ -87,7 +87,7 @@ IMAGE_CHECK → TARGET_CHECK → CONFIRMED → BACKUP → BACKUP_VERIFY
 
 [RootWriter](<../app/src/main/java/io/yu/flash/root/RootWriter.java>)是安装 APK 内的 Java 入口，经 Root `app_process` 启动；没有任意脚本或任意二进制写入入口。
 
-- 源普通文件与目标设备均固定打开，带 `O_NOFOLLOW` 并设置 close-on-exec；API 27+ 使用 `O_CLOEXEC`，API 26 在助手启动任何子进程前通过 `fcntl(F_SETFD, FD_CLOEXEC)` 设置。目标使用 **`O_RDWR | O_EXCL`**，同一 FD 贯穿原目标哈希、写入、`fsync` 和全量读回，不在阶段之间按路径重开。
+- 源普通文件与目标设备均固定打开，带 `O_NOFOLLOW` 并设置 close-on-exec；API 27+ 使用公开的 `O_CLOEXEC`，API 26 使用 [Android 8 bionic UAPI](https://android.googlesource.com/platform/bionic/+/android-8.0.0_r1/libc/kernel/uapi/asm-generic/fcntl.h) 已定义的 `02000000`（`0x80000`）标志值在 open 时设置；不调用高版本 `fcntlInt` 或反射隐藏接口。目标使用 **`O_RDWR | O_EXCL`**，同一 FD 贯穿原目标哈希、写入、`fsync` 和全量读回，不在阶段之间按路径重开。
 - 以 `fstat` 的块设备类型与 `st_rdev` 核对请求设备号，并对照路径、别名、sysfs `/dev` 及设备图；比较 sysfs 容量和已打开 FD 的 seek-end 容量。
 - 要求真实物理分区而非虚拟对象、非只读/非 dm；检查分区及父设备 holders/slaves。扫描可读进程的挂载命名空间，持续存在而无法读取的进程导致拒绝，并检查 swap 使用。
 - 再核对当前 boot ID/token/目标名、解锁、动态与 Virtual A/B 属性、槽位和允许的分区名。电量、温度与镜像类型由应用/核心写前策略检查，不宣称在整个传输中持续监控。

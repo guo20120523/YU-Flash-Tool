@@ -14,12 +14,12 @@ import java.util.Arrays;
 public final class RootWriter {
     private static String text(String path) throws IOException { return new String(Files.readAllBytes(new File(path).toPath()), java.nio.charset.StandardCharsets.UTF_8).trim(); }
     private static void check(boolean condition, String message) throws IOException { if (!condition) throw new IOException(message); }
+    // Android 8 bionic UAPI defines O_CLOEXEC=02000000 before the SDK exposes its Java name.
+    // https://android.googlesource.com/platform/bionic/+/android-8.0.0_r1/libc/kernel/uapi/asm-generic/fcntl.h
+    static final int API26_O_CLOEXEC = 0x80000;
     private static FileDescriptor open(String path, int flags, int mode) throws Exception {
-        // O_CLOEXEC is public from API 27. API 26 sets FD_CLOEXEC before any helper subprocess is started.
-        int closeOnExec = android.os.Build.VERSION.SDK_INT >= 27 ? OsConstants.O_CLOEXEC : 0;
-        FileDescriptor fd = Os.open(path, flags | closeOnExec | OsConstants.O_NOFOLLOW, mode);
-        try { Os.fcntlInt(fd, OsConstants.F_SETFD, OsConstants.FD_CLOEXEC); return fd; }
-        catch (Exception failure) { Os.close(fd); throw failure; }
+        int closeOnExec = android.os.Build.VERSION.SDK_INT >= 27 ? OsConstants.O_CLOEXEC : API26_O_CLOEXEC;
+        return Os.open(path, flags | closeOnExec | OsConstants.O_NOFOLLOW, mode);
     }
     private static final class Endpoint implements VerifiedCopy.Endpoint, AutoCloseable {
         final FileDescriptor fd;
