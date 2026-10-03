@@ -14,9 +14,16 @@ import java.util.Arrays;
 public final class RootWriter {
     private static String text(String path) throws IOException { return new String(Files.readAllBytes(new File(path).toPath()), java.nio.charset.StandardCharsets.UTF_8).trim(); }
     private static void check(boolean condition, String message) throws IOException { if (!condition) throw new IOException(message); }
+    private static FileDescriptor open(String path, int flags, int mode) throws Exception {
+        // O_CLOEXEC is public from API 27. API 26 sets FD_CLOEXEC before any helper subprocess is started.
+        int closeOnExec = android.os.Build.VERSION.SDK_INT >= 27 ? OsConstants.O_CLOEXEC : 0;
+        FileDescriptor fd = Os.open(path, flags | closeOnExec | OsConstants.O_NOFOLLOW, mode);
+        try { Os.fcntlInt(fd, OsConstants.F_SETFD, OsConstants.FD_CLOEXEC); return fd; }
+        catch (Exception failure) { Os.close(fd); throw failure; }
+    }
     private static final class Endpoint implements VerifiedCopy.Endpoint, AutoCloseable {
         final FileDescriptor fd;
-        Endpoint(String path, int flags) throws Exception { fd = Os.open(path, flags | OsConstants.O_CLOEXEC | OsConstants.O_NOFOLLOW, 0); }
+        Endpoint(String path, int flags) throws Exception { fd = open(path, flags, 0); }
         public int read(byte[] b, int o, int n) throws IOException { try { return Os.read(fd, b, o, n); } catch (Exception e) { throw new IOException(e); } }
         public int write(byte[] b, int o, int n) throws IOException { try { return Os.write(fd, b, o, n); } catch (Exception e) { throw new IOException(e); } }
         public void rewind() throws IOException { try { Os.lseek(fd, 0, OsConstants.SEEK_SET); } catch (Exception e) { throw new IOException(e); } }
@@ -135,7 +142,7 @@ public final class RootWriter {
             check(token.matches("[a-f0-9-]{36}"), "Invalid token");
             // Stable shared inode; never unlink it. A surviving helper excludes another helper.
             String lockDirectory = lockDirectory();
-            FileDescriptor lockFd = Os.open(lockDirectory + "/writer.lock", OsConstants.O_CREAT | OsConstants.O_RDWR | OsConstants.O_CLOEXEC | OsConstants.O_NOFOLLOW, 0600);
+            FileDescriptor lockFd = open(lockDirectory + "/writer.lock", OsConstants.O_CREAT | OsConstants.O_RDWR, 0600);
             StructStat lockStat = Os.fstat(lockFd);
             check(OsConstants.S_ISREG(lockStat.st_mode) && lockStat.st_uid == 0 && lockStat.st_nlink == 1, "Unsafe writer lock");
             try (FileOutputStream lockStream = new FileOutputStream(lockFd); FileLock lock = lockStream.getChannel().tryLock()) {
@@ -143,7 +150,7 @@ public final class RootWriter {
                 JSONObject permit = new JSONObject(text(marker));
                 check(permit.getString("token").equals(token) && permit.getString("bootId").equals(text("/proc/sys/kernel/random/boot_id")), "Stale launch permit");
                 // One-use capability, created under the stable lock. Never reused even after failure.
-                FileDescriptor used = Os.open(lockDirectory + "/used-" + token, OsConstants.O_CREAT | OsConstants.O_EXCL | OsConstants.O_WRONLY | OsConstants.O_NOFOLLOW, 0600);
+                FileDescriptor used = open(lockDirectory + "/used-" + token, OsConstants.O_CREAT | OsConstants.O_EXCL | OsConstants.O_WRONLY, 0600);
                 try { Os.fsync(used); } finally { Os.close(used); }
                 JSONObject r = new JSONObject(text(request));
                 String verifiedHash;
