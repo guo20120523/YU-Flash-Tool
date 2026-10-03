@@ -4,7 +4,7 @@
 
 ## 重要说明
 
-**本文件是基于当前构建声明整理的组件清单和许可核验提示，不是完整上游许可证文本合集，也不表示全部许可证、NOTICE、版权声明或传递依赖已经随工程/APK 打包。** 当前没有已交付 APK 或最终解析依赖清单，尚不能完成针对实际二进制产物的许可审计。
+**本文件是基于当前构建声明整理的组件清单和许可核验提示，不是完整上游许可证文本合集，也不表示全部许可证、NOTICE、版权声明或传递依赖已经随工程/APK 打包。** 已有 GitHub 构建交付 APK，但尚未完成针对实际二进制产物及完整传递依赖的许可审计。
 
 下述常见许可标识用于后续核验定位，应以所使用的具体版本、实际解析依赖及上游随附材料为准。本轮未下载组件或在线核验许可全文。不应把“使用开源组件”理解成免除再分发义务。
 
@@ -39,7 +39,7 @@
 | Compose UI Tooling、UI Test JUnit4、UI Test Manifest | BOM 2025.04.01 约束 | 调试或 Android 测试依赖；Apache-2.0；实际打包范围需核验 |
 | `androidx.test.ext:junit` | 1.2.1 | Android 测试扩展；Apache-2.0 |
 
-声明测试依赖不等于测试已运行通过。当前有 22 个核心 `@Test` 方法，以及 [UiSmokeTest](<app/src/androidTest/java/io/yu/flash/UiSmokeTest.kt>) 中 3 个未运行的 Android 冒烟测试。核心直接 JUnitCore 与修正本机参数编码后的 Gradle `:core:test` 均为 22 项通过，详见[验证记录](<docs/VERIFICATION.md>)。
+声明测试依赖不等于测试已运行通过。核心普通文件/故障模拟、Android 仪器测试的编译及实际设备验证是不同证据；详见[验证记录](<docs/VERIFICATION.md>)与对应 Release 的报告，不用测试依赖清单代替运行结果。
 
 ## 构建工具与 CI
 

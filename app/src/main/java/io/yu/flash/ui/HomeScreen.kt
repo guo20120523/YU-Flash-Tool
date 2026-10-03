@@ -106,7 +106,7 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
                                 modifier = Modifier.semantics { contentDescription = "读取并备份 ${partition.name}" }) { Text("读取") }
                             4 -> TextButton(onClick = { selectedIdentity = partition.identity; chooser.launch(arrayOf("*/*")) }, enabled = !busy,
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，仅检查，真实写入受阻" }) { Text("写入检查") }
+                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，检查后需另行确认真实写入" }) { Text("写入检查") }
                         } }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
@@ -121,7 +121,7 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
             Text("容量：${p.bytes} 字节\n类型：${p.kind.label()}\n块设备：${p.device}\n设备号：${p.identity}\n槽位：${p.slot ?: "未知/非 A/B"}\n风险：${p.risk}\n挂载：${p.mounted}\n映射/持有者：${p.mapped}")
             Text("路径来源 / 重复别名：\n${p.aliases.joinToString("\n")}")
             Text("读取策略：${runCatching { SafetyPolicy.backup(p); "允许进入确认，执行前再次检查" }.exceptionOrNull()?.message ?: "允许进入确认"}")
-            Text("写入：无已验证设备适配配置。型号、容量和名称均不能单独证明兼容。")
+            Text("写入：仅允许独立、未挂载的普通物理分区与完整等长 raw。需强制备份、确认完整名称及未验证的 AVB/回滚/机型兼容性风险；名称与容量匹配不保证可启动。")
         }
     }, confirmButton = { TextButton(onClick = { detail = null }) { Text("关闭") } }) }
 }

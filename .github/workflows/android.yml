@@ -1,4 +1,4 @@
-name: Android safety-preview build
+name: Android raw-preview build
 on:
   workflow_dispatch:
   push:
@@ -50,7 +50,7 @@ jobs:
           cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk deliverables/YU-Flash-Tool-androidTest.apk
           zip -r deliverables/YU-Flash-Tool-verification.zip core/build/reports/tests core/build/test-results app/build/reports/lint-results-debug.*
           git archive --format=zip --output=deliverables/YU-Flash-Tool-source.zip HEAD
-          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nType: debug safety preview; hardware writing disabled\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > deliverables/BUILD-INFO.txt
+          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nType: debug raw-write preview; limited physical writes enabled; hardware validation NOT performed\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > deliverables/BUILD-INFO.txt
           cp LICENSE THIRD_PARTY_NOTICES.md deliverables/
           python3 scripts/release_notes.py
           (cd deliverables && sha256sum *.apk *.zip BUILD-INFO.txt LICENSE THIRD_PARTY_NOTICES.md RELEASE-NOTES.md > SHA256SUMS.txt)
@@ -85,6 +85,6 @@ jobs:
           # Create as draft so incomplete uploads are not advertised as a release.
           gh release create "$tag" deliverables/* \
             --target "$GITHUB_SHA" --draft --prerelease \
-            --title "YU-Flash-Tool 安全预览 · 构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
+            --title "YU-Flash-Tool Raw 写入预览 · 构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             --notes-file deliverables/RELEASE-NOTES.md
           gh release edit "$tag" --draft=false

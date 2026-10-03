@@ -36,6 +36,9 @@ internal class PartitionRepository(private val context: Context, val shell: Root
             result.checked()
             requireSafe(probe.length() == 4096L && result.output.lines().any { it.trim() == "4096" } &&
                 result.output.contains(ImageInspector.sha256(probe)), "Toybox 实际行为校验失败")
+            shell.run("CLASSPATH=${ShellArg.installedApk(context.applicationInfo.sourceDir)} /system/bin/app_process / io.yu.flash.root.RootWriter --probe ${ShellArg.path(context.cacheDir.path)}", 60).checked().let {
+                requireSafe(it == "YU_WRITER_READY", "Root 写入组件普通文件自检失败（未操作块设备）")
+            }
             toolsReady = true
         } finally { probe.delete() }
     }
@@ -44,6 +47,9 @@ internal class PartitionRepository(private val context: Context, val shell: Root
             /system/bin/getprop ro.boot.slot_suffix
             /system/bin/getprop ro.boot.flash.locked
             /system/bin/getprop ro.boot.vbmeta.device_state
+            /system/bin/getprop ro.virtual_ab.enabled
+            /system/bin/getprop ro.boot.dynamic_partitions
+            /system/bin/getprop ro.boot.dynamic_partitions_retrofit
         """.trimIndent())
         result.checked()
         // Preserve an empty first property on non-A/B devices: trim() shifts line positions.
@@ -59,8 +65,11 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val scale = battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val temperature = battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
         val plugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-        // getprop alone cannot prove snapshot/AVB safety. Device-specific evidence is absent.
-        return Environment(Build.FINGERPRINT, suffix, unlocked, Truth.UNKNOWN, Truth.UNKNOWN,
+        // Scope exclusion, not proof an OTA/AVB image is compatible. Virtual A/B is refused wholesale.
+        val virtual = props.getOrNull(3).orEmpty()
+        val legacy = (virtual == "false" || (virtual.isEmpty() && Build.VERSION.SDK_INT < 29)) &&
+            props.getOrNull(4) != "true" && props.getOrNull(5) != "true"
+        return Environment(Build.FINGERPRINT, suffix, unlocked, if (legacy) Truth.YES else Truth.UNKNOWN, Truth.UNKNOWN,
             if (level >= 0 && scale > 0) level * 100 / scale else null,
             temperature?.takeIf { it != Int.MIN_VALUE }?.div(10.0), plugged?.takeIf { it >= 0 }?.let { it != 0 }, toolsReady)
     }
@@ -81,7 +90,7 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val mapped = shell.run("for d in /sys/class/block/dm-*/dm/name; do [ ! -f \"${'$'}d\" ] || /system/bin/toybox cat \"${'$'}d\"; done; exit 0").checked()
         if (mapped.isNotBlank()) diagnostics += "发现独立 device-mapper 设备（不作为可写 by-name 对象）：\n${mapped.take(2048)}"
         if (partitions.isEmpty()) diagnostics += "没有可验证的 by-name 块设备；已限制探测范围为 /dev/block 的常见目录，未扫描整个文件系统"
-        diagnostics += "动态分区/Virtual A/B/AVB 兼容性未完成设备级验证：写入关闭"
+        diagnostics += "写入仅支持未使用的独立物理分区及等长 raw；动态/Virtual A/B 拒绝。AVB/回滚/机型兼容性未验证，不保证可启动。RPMB 在内容读取前排除。"
         return Discovery(partitions, environment(), diagnostics.joinToString("\n"))
     }
     suspend fun inspect(alias: String): Partition {
@@ -90,7 +99,11 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val device = shell.run("/system/bin/toybox readlink -f ${ShellArg.path(alias)}").checked()
         requireSafe(device.startsWith("/dev/block/"), "符号链接越出 /dev/block")
         val block = ShellArg.name(device.substringAfterLast('/'))
+        requireSafe(!block.contains("rpmb", true) && !name.contains("rpmb", true), "RPMB 是特殊协议设备，已跳过内容探测")
         val q = ShellArg.path(device)
+        val topology = shell.run("[ -f /sys/class/block/$block/partition ] && /system/bin/toybox readlink -f /sys/class/block/$block; /system/bin/toybox cat /sys/class/block/$block/ro").checked().lines()
+        val physical = topology.firstOrNull()?.let { it.startsWith("/sys/devices/") && !it.contains("/virtual/") } == true
+        val writable = when (topology.lastOrNull()) { "0" -> Truth.YES; "1" -> Truth.NO; else -> Truth.UNKNOWN }
         val info = shell.run("""
             set -e
             [ -b $q ]
@@ -106,7 +119,8 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val mounted = if (mounts.isEmpty()) Truth.UNKNOWN else if (mounts.any { it.split(' ').getOrNull(2) == identity }) Truth.YES else Truth.NO
         val graph = shell.run("""
             if [ -d /sys/class/block/$block/dm ]; then echo mapped; fi
-            for p in /sys/class/block/$block/holders/*; do [ ! -e "${'$'}p" ] || echo holder; done
+            [ -d /sys/class/block/$block/holders ] || echo unknown
+            for p in /sys/class/block/$block/holders/* /sys/class/block/$block/slaves/*; do [ ! -e "${'$'}p" ] || echo holder; done
             exit 0
         """.trimIndent()).checked()
         val hex = shell.run("/system/bin/toybox od -v -An -tx1 -N4096 $q").checked()
@@ -117,11 +131,12 @@ internal class PartitionRepository(private val context: Context, val shell: Root
             base in setOf("userdata", "metadata", "cache") -> Risk.DATA
             graph.isNotEmpty() || base == "super" -> Risk.DYNAMIC
             base in setOf("boot", "init_boot", "vendor_boot", "recovery") && kind in setOf(ImageKind.BOOT, ImageKind.VENDOR_BOOT) -> Risk.BOOT_CHAIN
+            base in setOf("system", "vendor", "product", "odm", "system_ext", "vendor_dlkm", "odm_dlkm", "system_dlkm") && kind in setOf(ImageKind.EXT4, ImageKind.F2FS, ImageKind.EROFS) -> Risk.FILESYSTEM
             base in setOf("modem", "persist", "efs", "xbl", "abl", "preloader", "vbmeta", "frp") -> Risk.CRITICAL
             else -> Risk.UNKNOWN
         }
         return Partition(name, alias, device, identity, bytes, kind,
             name.takeLast(2).takeIf { it in listOf("_a", "_b") }?.removePrefix("_"), risk, mounted,
-            if (graph.isNotEmpty()) Truth.YES else Truth.NO)
+            if (graph.isNotEmpty()) Truth.YES else Truth.NO, physical = if (physical) Truth.YES else Truth.NO, writable = writable)
     }
 }

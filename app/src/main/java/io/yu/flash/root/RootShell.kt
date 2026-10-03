@@ -41,6 +41,11 @@ internal class SuExecutor(private val directory: java.io.File) : RootExecutor {
 }
 internal class RootFailure(val state: RootState, message: String) : IOException(message)
 internal object ShellArg {
+    // Only OS-provided installed APK path may contain package manager's ~ and = characters.
+    fun installedApk(value: String): String {
+        requireSafe(value.startsWith("/") && !value.contains('\u0000') && value.endsWith(".apk"), "安装 APK 路径无效")
+        return "'" + value.replace("'", "'\\''") + "'"
+    }
     fun path(value: String): String {
         requireSafe(value.startsWith("/") && value.length <= 512 &&
             Regex("/[A-Za-z0-9_./:-]+").matches(value) && value.split('/').none { it == ".." }, "路径不在受控字符集内")

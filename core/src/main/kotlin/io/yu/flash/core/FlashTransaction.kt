@@ -18,11 +18,11 @@ class TransactionGate {
 data class ConfirmedWrite(
     val target: Partition, val image: ImportedImage, val environment: Environment,
     val location: BackupLocation, val typedName: String, val settings: SafetySettings,
-    val confirmed: Boolean
+    val confirmed: Boolean, val compatibilityRiskAccepted: Boolean = false
 )
 class FlashTransaction(
     private val device: DeviceAccess, private val audit: AuditLog,
-    private val registry: ProfileRegistry, private val gate: TransactionGate
+    private val gate: TransactionGate
 ) {
     suspend fun execute(request: ConfirmedWrite): String = gate.exclusive {
         val id = UUID.randomUUID().toString()
@@ -32,13 +32,14 @@ class FlashTransaction(
         try {
             stage(Stage.IMAGE_CHECK)
             requireSafe(request.confirmed && request.typedName == target.name, "用户取消或分区名称确认不匹配")
+            requireSafe(request.compatibilityRiskAccepted, "必须明确确认：AVB/回滚/设备兼容性未验证，可能无法启动")
             val image = ImageInspector.inspect(request.image.file, request.image.displayName)
             requireSafe(image == request.image, "暂存镜像发生变化")
             stage(Stage.TARGET_CHECK)
             val (fresh, environment) = device.refresh(target)
             requireSafe(SafetyPolicy.sameTarget(target, fresh) && environment.slot == request.environment.slot &&
                 environment.fingerprint == request.environment.fingerprint, "目标身份、设备构建或槽位发生变化")
-            SafetyPolicy.write(fresh, image, environment, request.settings, registry)
+            SafetyPolicy.write(fresh, image, environment, request.settings)
             stage(Stage.CONFIRMED)
             stage(Stage.BACKUP)
             val backup = device.backup(fresh, request.location, id)
@@ -56,13 +57,10 @@ class FlashTransaction(
             val (last, lastEnvironment) = device.refresh(target)
             requireSafe(SafetyPolicy.sameTarget(fresh, last) && lastEnvironment.slot == environment.slot &&
                 lastEnvironment.fingerprint == environment.fingerprint, "写入前目标或槽位改变")
-            SafetyPolicy.write(last, ready, lastEnvironment, request.settings, registry)
+            SafetyPolicy.write(last, ready, lastEnvironment, request.settings)
             stage(Stage.WRITING, "开始后中断可能导致分区损坏；不会自动重试或回滚")
-            device.write(last, ready)
-            stage(Stage.SYNCING)
-            device.sync()
-            stage(Stage.READBACK, bytes = ready.bytes)
-            requireSafe(device.hashRange(last, ready.bytes) == ready.sha256, "读回 SHA-256 不匹配")
+            val receipt = device.writeAndVerify(last, ready, backup) { step, count -> stage(step, bytes = count) }
+            requireSafe(receipt == WriteReceipt(last.identity, ready.bytes, ready.sha256), "写入回执身份/长度/SHA-256 不匹配")
             stage(Stage.SUCCESS, "仅验证 ${ready.bytes} 字节与输入一致；不保证兼容或可启动", ready.bytes)
             id
         } catch (e: Exception) {

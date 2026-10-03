@@ -24,6 +24,8 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
     val operation by vm.operation.collectAsStateWithLifecycle()
     val prompt by vm.backupPrompt.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val writePrompt by vm.writePrompt.collectAsStateWithLifecycle()
+    val checkingWrite by vm.checkingWrite.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route ?: "主页"
@@ -84,16 +86,38 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
                 vm.startBackup()
             }) { Text("理解风险并备份") } }, dismissButton = { TextButton(onClick = { vm.backupPrompt.value = null }) { Text("取消") } })
     }
-    operation.imported?.let { image ->
-        AlertDialog(onDismissRequest = vm::dismissImport, title = { Text("镜像检查 · 不放行刷写") }, text = {
+    operation.imported?.takeIf { writePrompt == null }?.let { image ->
+        AlertDialog(onDismissRequest = { if (!checkingWrite) vm.dismissImport() }, title = { Text("镜像检查 · 尚未写入") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
                 Text("目标：${operation.importTarget?.name}\n槽位：${operation.importTarget?.slot ?: "未知"}\n设备：${operation.importTarget?.device}\n容量：${operation.importTarget?.bytes} 字节")
                 Text("文档名：${image.displayName}\n实际长度：${image.bytes} 字节\n类型：${image.kind}\nSHA-256：${image.sha256}")
                 Text("强制备份目录：${settings.backupPath}")
-                WarningCard("没有经真机验证的适配配置。OTA 快照、AVB 与回滚兼容性未知，拒绝进入写入确认。错误镜像或错误分区可能导致无法启动、数据丢失或变砖。")
+                WarningCard("仅支持未挂载、非动态/快照的普通物理分区与等容量 raw 镜像。AVB、回滚和设备兼容性未验证；通过检查也可能无法启动、数据丢失或变砖。")
                 Text("规范命名不会改变内容或兼容性。用户原始文档未修改；可在设置中清理私有暂存。")
             }
-        }, confirmButton = { TextButton(onClick = vm::dismissImport) { Text("关闭（不写入）") } })
+        }, confirmButton = { Button(onClick = vm::prepareWrite, enabled = !operation.busy && !checkingWrite) { Text(if (checkingWrite) "检查中…" else "检查写入条件") } },
+            dismissButton = { TextButton(onClick = vm::dismissImport, enabled = !checkingWrite) { Text("关闭（不写入）") } })
+    }
+    writePrompt?.let { request ->
+        var typedName by remember(request) { mutableStateOf("") }
+        var accepted by remember(request) { mutableStateOf(false) }
+        AlertDialog(onDismissRequest = vm::cancelWrite, title = { Text("最终确认 · 真实覆盖分区") }, text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
+                Text("目标：${request.target.name}\n槽位：${request.target.slot ?: "非 A/B"}\n块设备：${request.target.device}\n身份：${request.target.identity}\n容量：${request.target.bytes} 字节")
+                Text("镜像：${request.image.kind} · ${request.image.bytes} 字节\nSHA-256：${request.image.sha256}\n强制备份目录：${request.location.path}\n剩余空间：${request.location.available} 字节")
+                WarningCard("写入后无法安全取消。失败可能留下部分改写的分区；不会自动重试、回滚、切槽、重启或关闭 AVB。备份和读回一致均不保证可启动或可恢复。")
+                Row {
+                    Checkbox(checked = accepted, onCheckedChange = { accepted = it })
+                    Text("我接受 AVB、回滚索引及设备兼容性未验证的风险，已准备外部救援方式。", Modifier.padding(top = 12.dp))
+                }
+                OutlinedTextField(value = typedName, onValueChange = { typedName = it }, singleLine = true,
+                    label = { Text("完整输入 ${request.target.name}（区分大小写）") }, modifier = Modifier.fillMaxWidth())
+            }
+        }, confirmButton = { Button(enabled = accepted && typedName == request.target.name && !operation.busy,
+            onClick = {
+                if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                vm.confirmWrite(typedName, accepted)
+            }) { Text("备份并真实写入") } }, dismissButton = { TextButton(onClick = vm::cancelWrite) { Text("取消，不写入") } })
     }
 }
 

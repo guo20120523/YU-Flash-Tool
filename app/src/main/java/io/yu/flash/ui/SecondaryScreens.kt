@@ -58,16 +58,16 @@ internal fun SettingsScreen(vm: MainViewModel, settings: AppSettings, busy: Bool
         Text("备份与安全", style = MaterialTheme.typography.titleLarge)
         ChoiceMenu("备份路径：${settings.backupPath}", listOf("/sdcard/download", "/sdcard/Download")) { vm.setText("backupPath", it) }
         Text("选择即为明确配置该大小写路径；实际读取前另行确认。首版不支持任意目录或静默替换。\n目录规则：YU-Flash-Tool/设备标识/时间戳-任务ID/分区名.img")
-        Text("✓ 写入前强制备份：固定开启\n✓ SHA-256 完整性校验：不可关闭\n✓ 未知风险、快照及 AVB 状态：拒绝写入", color = MaterialTheme.colorScheme.primary)
+        Text("✓ 写入前强制备份：固定开启\n✓ SHA-256 完整性校验：不可关闭\n✓ 动态/快照及未知目标：拒绝写入\n⚠ AVB/回滚/机型兼容性未验证：必须显式确认风险", color = MaterialTheme.colorScheme.primary)
         ChoiceMenu("最低电量：${settings.minBattery}%", listOf("50", "60", "70", "80", "90", "100")) { vm.setBattery(it.toInt()) }
         Text("电量至少 50%、温度 0–42°C 是本应用保守策略，不是 Android 官方统一标准。")
         Toggle("写入要求连接电源", settings.requireCharging) { vm.setFlag("requireCharging", it) }
-        Toggle("只读任务完成通知", settings.completionNotice) { vm.setFlag("completionNotice", it) }
-        Text("真实刷写与成功后自动清理暂存尚未开放；可手动清理，永不自动删除备份。")
+        Toggle("任务完成通知", settings.completionNotice) { vm.setFlag("completionNotice", it) }
+        Text("成功后不自动清理暂存；无任务且无写入互锁时可手动清理，永不自动删除备份。")
         Toggle("显示高风险 / 未知分区", settings.showHighRisk) { vm.setFlag("showHighRisk", it) }
         Toggle("显示更多诊断信息（不会绕过安全检查）", settings.verbose) { vm.setFlag("verbose", it) }
         OutlinedButton(onClick = vm::cleanup, enabled = !busy) { Text("清理所有私有暂存镜像（保留备份）") }
-        WarningCard("首版未启用真实分区写入。无专家绕过、批量刷写、任意 Shell 或后台自动刷写。")
+        WarningCard("真实写入仅限策略允许的普通物理分区与完整等长 raw。无专家绕过、批量刷写、任意 Shell 或后台自动刷写。进程状态不明时设备操作及清理被互锁禁止。")
     }
 }
 @Composable
@@ -92,10 +92,10 @@ internal fun AboutScreen() {
             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("开发者 QQ", "3895958954"))
         }) { Text("复制 QQ 3895958954") }
         Text("版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n构建类型 ${BuildConfig.BUILD_TYPE}\nAndroid API 26–35 设计目标；尚未真机验证")
-        Text("用途：本地分区发现、镜像检查与受限备份。Root 仅用于主动授权后的设备探测、读取和工具能力检测。Root 不等于 Bootloader 解锁。")
+        Text("用途：本地分区发现、镜像检查、备份与受限 raw 写入。Root 用于主动授权后的设备访问，实际刷写需另外确认完整分区名及兼容性风险。Root 不等于 Bootloader 解锁。")
         WarningCard("错误镜像或错误分区可能导致设备无法启动、数据丢失或变砖。备份不代表一定能够恢复；命令成功或哈希一致不代表设备能正常启动。")
         Text("隐私：核心功能离线工作，无网络权限、广告或分析 SDK。镜像留在本机；暂存位于私有目录，备份位于下载目录，可能被其他应用或云同步访问。卸载会清除私有任务记录及暂存，不会清除下载目录备份。")
-        Text("兼容边界：仅在实际 Toybox 工具自检通过时检测和备份。拒绝 userdata、已挂载/映射对象。无合格设备配置，真实写入硬件适配器关闭。非 A/B、动态分区、Virtual A/B、AVB 和回滚保护未提供完整适配。")
+        Text("兼容边界：需 Toybox 与 Root 写入组件普通文件自检通过。写入拒绝 userdata、整盘、RPMB、已挂载/映射/动态/Virtual A/B 对象；A/B 仅允许明确非当前槽。AVB、回滚和机型兼容性未验证。真实块设备写入尚未真机验收。")
         Text("Copyright (C) 昱yu · GPL-3.0-only。允许按 GPL v3 复制、修改及再分发；本程序不提供任何担保。\n源码：https://github.com/guo20120523/YU-Flash-Tool")
         OutlinedButton(onClick = { showLicense = true }) { Text("查看 GPL v3 许可证全文") }
         Text("开源组件：AndroidX / Compose / Material3 / Lifecycle / Navigation / DataStore / WindowManager（Apache-2.0），Kotlin 与 kotlinx.coroutines（Apache-2.0）。构建侧 JUnit 4（EPL-1.0）。依赖与许可证类型见工程 THIRD_PARTY_NOTICES.md；该声明不等于完整上游许可证，发布前需补齐。反馈请使用上述源码仓库 Issues。")
