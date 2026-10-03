@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- M3 baseline primaryContainer / onPrimaryContainer. Launcher colors cannot
+         depend on Compose or runtime wallpaper; API 33 themed icons use monochrome. -->
+    <color name="launcher_primary_container">#EADDFF</color>
+    <color name="launcher_on_primary_container">#21005D</color>
+</resources>

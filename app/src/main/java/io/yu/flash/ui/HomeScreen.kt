@@ -63,7 +63,7 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
         Text("分区", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = Spacing.small))
         Text("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}\nRoot：${home.root} · 当前槽位：${home.environment?.slot ?: "未知"}", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
-            Button(onClick = vm::refresh, enabled = !home.loading && !busy) { Text(if (home.root == RootState.NOT_REQUESTED) "了解用途并申请 Root" else "重新检测 / 刷新") }
+            Button(onClick = vm::refresh, enabled = !home.loading && !busy) { ButtonSymbol(Symbol.Refresh); Text(if (home.root == RootState.NOT_REQUESTED) "了解用途并申请 Root" else "重新检测 / 刷新") }
         }
         if (home.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在只读检查 Root、工具和分区，请等待授权…") }
         home.error?.let { WarningCard(it) }
@@ -76,14 +76,14 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
             } }
         } else {
             item(key = "search") {
-            OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("搜索分区名称") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("搜索分区名称") }, leadingIcon = { SymbolIcon(Symbol.Search) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             }
             item(key = "filters") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
                 ChoiceMenu("排序：$sort", listOf("名称", "大小", "类型")) { sort = it }
                 ChoiceMenu("槽位：$slot", listOf("全部", "a", "b", "无/未知")) { slot = it }
                 ChoiceMenu("风险：$risk", listOf("全部") + Risk.entries.map { it.name }) { risk = it }
-                FilterChip(selected = readable, onClick = { readable = !readable }, label = { Text("仅可读取") })
+                FilterChip(selected = readable, onClick = { readable = !readable }, label = { Text("仅可读取") }, leadingIcon = { SymbolIcon(if (readable) Symbol.Check else Symbol.Download, modifier = Modifier.size(18.dp)) })
             }
             }
             if (rows.isEmpty()) item(key = "empty") {
@@ -103,16 +103,16 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
                             1 -> TextButton(onClick = { detail = partition }) { Text(capacity(partition.bytes, settings.binaryUnits)) }
                             2 -> Text(partition.kind.label(), style = MaterialTheme.typography.bodyMedium)
                             3 -> OutlinedButton(onClick = { vm.prepareBackup(partition) }, enabled = !busy,
-                                modifier = Modifier.semantics { contentDescription = "读取并备份 ${partition.name}" }) { Text("读取") }
+                                modifier = Modifier.semantics { contentDescription = "读取并备份 ${partition.name}" }) { ButtonSymbol(Symbol.Download); Text("读取") }
                             4 -> TextButton(onClick = { selectedIdentity = partition.identity; chooser.launch(arrayOf("*/*")) }, enabled = !busy,
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，检查后需另行确认真实写入" }) { Text("写入检查") }
+                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，检查后需另行确认真实写入" }) { ButtonSymbol(Symbol.Upload); Text("写入检查") }
                         } }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
             item(key = "diagnostics") {
-                TextButton(onClick = { vm.message.value = home.diagnostics }) { Text("查看检测诊断 · 写入受安全限制") }
+                TextButton(onClick = { vm.message.value = home.diagnostics }) { ButtonSymbol(Symbol.Info); Text("查看检测诊断 · 写入受安全限制") }
             }
         }
     }
@@ -135,7 +135,7 @@ private fun TableRow(compact: Boolean = false, content: @Composable (Int) -> Uni
 internal fun ChoiceMenu(label: String, options: List<String>, onChoose: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }) { Text(label) }
+        OutlinedButton(onClick = { expanded = true }) { Text(label); Spacer(Modifier.width(Spacing.small)); SymbolIcon(Symbol.ExpandMore, modifier = Modifier.size(18.dp)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) { options.forEach { option ->
             DropdownMenuItem(text = { Text(option) }, onClick = { onChoose(option); expanded = false })
         } }

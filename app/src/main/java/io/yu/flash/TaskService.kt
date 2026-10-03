@@ -24,7 +24,7 @@ class TaskService : Service() {
     }
     private fun notification(phase: String): Notification {
         val intent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return NotificationCompat.Builder(this, "operations").setSmallIcon(android.R.drawable.stat_sys_upload)
+        return NotificationCompat.Builder(this, "operations").setSmallIcon(R.drawable.ms_sync_24)
             .setContentTitle("YU-Flash-Tool").setContentText(phase).setContentIntent(intent)
             .setOngoing(true).setProgress(0, 0, true).setOnlyAlertOnce(true).build()
     }
@@ -63,7 +63,7 @@ class TaskService : Service() {
                         if (allowed && graph.settings.flow.first().completionNotice) {
                             getSystemService(NotificationManager::class.java).notify(42,
                                 NotificationCompat.Builder(this@TaskService, "operations")
-                                    .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                                    .setSmallIcon(if (state.error == null) R.drawable.ms_assignment_24 else R.drawable.ms_error_24)
                                     .setContentTitle("YU-Flash-Tool · 任务结束")
                                     .setContentText(state.error ?: state.phase).setAutoCancel(true).build())
                         }
