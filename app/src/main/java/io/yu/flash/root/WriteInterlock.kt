@@ -17,8 +17,12 @@ internal class WriteInterlock(private val directory: File) {
         requireSafe(Regex("[a-f0-9-]{36}").matches(it), "无法获取内核启动 ID，拒绝写入")
     }
     private fun syncDirectory() {
-        val fd = Os.open(directory.path, OsConstants.O_RDONLY or OsConstants.O_DIRECTORY, 0)
-        try { Os.fsync(fd) } finally { Os.close(fd) }
+        // O_DIRECTORY is not exposed by the public Android SDK. Validate the opened FD instead.
+        val fd = Os.open(directory.path, OsConstants.O_RDONLY or OsConstants.O_NOFOLLOW or OsConstants.O_CLOEXEC, 0)
+        try {
+            requireSafe(OsConstants.S_ISDIR(Os.fstat(fd).st_mode), "互锁父目录不是目录，拒绝写入")
+            Os.fsync(fd)
+        } finally { Os.close(fd) }
     }
     @Synchronized fun check() {
         requireSafe(!armFailed, "写入互锁持久化失败；本进程禁止设备操作和清理")
