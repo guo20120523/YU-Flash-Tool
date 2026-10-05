@@ -1,4 +1,4 @@
-name: Android raw-preview build
+name: Android signed release build
 on:
   workflow_dispatch:
   push:
@@ -6,12 +6,17 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  # Public certificate identity, not a secret. Changes require a deliberate key migration.
+  YU_RELEASE_CERT_SHA256: 483F4F09834E6C6156B473B51F8A8D4A6B71B36EBE332E1F9362F15532EB1F4D
 jobs:
   verify-and-build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,10 +34,42 @@ jobs:
           set -euo pipefail
           test -n "${ANDROID_HOME:-}"
           test -f "$ANDROID_HOME/platforms/android-35/android.jar"
-          test -d "$ANDROID_HOME/build-tools/35.0.0"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/aapt"
           printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
-      - name: Lint Android and assemble debug APKs
+      - name: Lint Android and compile debug plus instrumentation APKs (do not execute tests)
         run: gradle :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --console=plain
+      - name: Restore permanent release keystore outside checkout
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          YU_RELEASE_KEYSTORE_BASE64: ${{ secrets.YU_RELEASE_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          value = os.environ.get('YU_RELEASE_KEYSTORE_BASE64', '')
+          if not value:
+              raise SystemExit('Missing YU_RELEASE_KEYSTORE_BASE64; refusing unsigned release')
+          path = Path(os.environ['RUNNER_TEMP']) / 'yu-release.p12'
+          with path.open('xb') as stream:
+              stream.write(base64.b64decode(value, validate=True))
+          path.chmod(0o600)
+          PY
+      - name: Lint release and assemble with permanent signing identity
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          YU_RELEASE_KEYSTORE: ${{ runner.temp }}/yu-release.p12
+          YU_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.YU_RELEASE_KEYSTORE_PASSWORD }}
+          YU_RELEASE_KEY_ALIAS: ${{ secrets.YU_RELEASE_KEY_ALIAS }}
+          YU_RELEASE_KEY_PASSWORD: ${{ secrets.YU_RELEASE_KEY_PASSWORD }}
+        run: gradle :app:lintRelease :app:assembleRelease --no-daemon --no-configuration-cache --console=plain
+      - name: Remove private keystore even after failure
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/yu-release.p12"
       - name: Upload test and lint evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,30 +79,68 @@ jobs:
             core/build/reports/tests/
             core/build/test-results/
             app/build/reports/lint-results-debug.*
+            app/build/reports/lint-results-release.*
           if-no-files-found: warn
-      - name: Record build provenance and corresponding source
+      - name: Upload unsigned-branch debug build (not an official release)
+        if: github.event_name == 'pull_request' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
+        uses: actions/upload-artifact@v4
+        with:
+          name: YU-Flash-Tool-debug-validation
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+      - name: Verify signed APK identity and record matching source and evidence
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p deliverables
-          cp app/build/outputs/apk/debug/app-debug.apk deliverables/YU-Flash-Tool-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk deliverables/YU-Flash-Tool.apk
           cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk deliverables/YU-Flash-Tool-androidTest.apk
-          zip -r deliverables/YU-Flash-Tool-verification.zip core/build/reports/tests core/build/test-results app/build/reports/lint-results-debug.*
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs deliverables/YU-Flash-Tool.apk > deliverables/APKSIGNER.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging deliverables/YU-Flash-Tool.apk > deliverables/APK-BADGING.txt
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          signing = Path('deliverables/APKSIGNER.txt').read_text()
+          actual = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)$', signing, re.M)
+          expected = os.environ['YU_RELEASE_CERT_SHA256']
+          if len(actual) != 1 or actual[0].upper() != expected:
+              raise SystemExit('Unexpected release signer; refusing publication')
+          badging = Path('deliverables/APK-BADGING.txt').read_text()
+          match = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", badging, re.M)
+          if not match or match.groups() != ('io.yu.flash', '5', '1.0.0'):
+              raise SystemExit('APK package/version does not match release contract')
+          if re.search(r'^application-debuggable(?:\s|$)', badging, re.M):
+              raise SystemExit('Release APK is debuggable')
+          metadata = json.loads(Path('app/build/outputs/apk/release/output-metadata.json').read_text())
+          elements = metadata.get('elements', [])
+          if metadata.get('applicationId') != 'io.yu.flash' or metadata.get('variantName') != 'release' or len(elements) != 1:
+              raise SystemExit('Unexpected release output metadata')
+          if elements[0].get('versionCode') != 5 or elements[0].get('versionName') != '1.0.0' or elements[0].get('outputFile') != 'app-release.apk':
+              raise SystemExit('Release metadata version/file mismatch')
+          Path('deliverables/SIGNING-CERTIFICATE-SHA256.txt').write_text(
+              f'YU-Flash-Tool permanent release certificate SHA-256: {expected}\n'
+              'This is the public certificate fingerprint, NOT the APK file hash.\n')
+          PY
+          zip -r deliverables/YU-Flash-Tool-verification.zip core/build/reports/tests core/build/test-results app/build/reports/lint-results-debug.* app/build/reports/lint-results-release.*
           git archive --format=zip --output=deliverables/YU-Flash-Tool-source.zip HEAD
-          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nType: debug raw-write preview; limited physical writes enabled; hardware validation NOT performed\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > deliverables/BUILD-INFO.txt
+          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nRun number/attempt: %s/%s\nVersion: 1.0.0 (5)\nPackage: io.yu.flash\nType: permanently signed release; non-debuggable\nCertificate SHA-256: %s\nToolchain: Temurin 17; Gradle 8.11.1; AGP 8.9.2; Kotlin 2.1.20; SDK 35; verification Build Tools 35.0.0\nInstrumentation APK: compiled only, NOT executed\nHardware/Root/write/compatibility/stability validation: NOT performed by this build\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" "$YU_RELEASE_CERT_SHA256" > deliverables/BUILD-INFO.txt
           cp LICENSE THIRD_PARTY_NOTICES.md deliverables/
           python3 scripts/release_notes.py
-          (cd deliverables && sha256sum *.apk *.zip BUILD-INFO.txt LICENSE THIRD_PARTY_NOTICES.md RELEASE-NOTES.md > SHA256SUMS.txt)
-      - name: Upload APK and matching source (only after successful checks)
+          (cd deliverables && sha256sum -- * > SHA256SUMS.txt.tmp && mv SHA256SUMS.txt.tmp SHA256SUMS.txt && sha256sum --check SHA256SUMS.txt)
+      - name: Upload signed release and matching source (only after successful checks)
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: actions/upload-artifact@v4
         with:
-          name: YU-Flash-Tool-debug-apk
+          name: YU-Flash-Tool-signed-release
           path: deliverables/
           if-no-files-found: error
 
   publish-release:
     needs: verify-and-build
-    # Never publish PR code or an arbitrary branch; grant write only to this job.
+    # No secrets or write permissions for PR builds; only this job may publish.
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     permissions:
@@ -73,9 +148,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: YU-Flash-Tool-debug-apk
+          name: YU-Flash-Tool-signed-release
           path: deliverables
-      - name: Publish immutable per-run preview with detailed notes
+      - name: Publish independent formal release with detailed evidence
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -83,10 +158,11 @@ jobs:
         run: |
           set -euo pipefail
           (cd deliverables && sha256sum --check SHA256SUMS.txt)
-          tag="preview-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
-          # Create as draft so incomplete uploads are not advertised as a release.
+          tag="release-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          # Unique per-run tag: never replace an older build or reuse a version tag.
+          # Draft first: incomplete upload is not advertised as a published release.
           gh release create "$tag" deliverables/* \
-            --target "$GITHUB_SHA" --draft --prerelease \
-            --title "YU-Flash-Tool Raw 写入预览 · 构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
+            --target "$GITHUB_SHA" --draft \
+            --title "YU-Flash-Tool 1.0.0 · 正式签名构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             --notes-file deliverables/RELEASE-NOTES.md
-          gh release edit "$tag" --draft=false
+          gh release edit "$tag" --draft=false --prerelease=false

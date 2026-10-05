@@ -27,7 +27,7 @@ internal fun TasksScreen(vm: MainViewModel) {
         Text("任务记录", style = MaterialTheme.typography.headlineMedium)
         Text("记录操作阶段，不将命令成功等同于可启动。进程中断后不会自动恢复写入。", style = MaterialTheme.typography.bodyMedium)
         OutlinedButton(onClick = { preview = true }, enabled = events.isNotEmpty()) { ButtonSymbol(Symbol.Upload); Text("导出脱敏记录") }
-        if (events.isEmpty()) Text("暂无任务。备份、导入检查和受限事务的记录将在此显示。", Modifier.padding(vertical = Spacing.large))
+        if (events.isEmpty()) Text("暂无任务。手动备份、文件暂存和直接 dd 写入的记录将在此显示。", Modifier.padding(vertical = Spacing.large))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
             items(events) { event -> OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(Spacing.medium), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
@@ -68,22 +68,14 @@ internal fun SettingsScreen(vm: MainViewModel, settings: AppSettings, busy: Bool
         Text("备份与安全", style = MaterialTheme.typography.titleLarge)
         ChoiceMenu("备份路径：${settings.backupPath}", listOf("/sdcard/download", "/sdcard/Download")) { vm.setText("backupPath", it) }
         Text("选择即为明确配置该大小写路径；实际读取前另行确认。首版不支持任意目录或静默替换。\n目录规则：YU-Flash-Tool/设备标识/时间戳-任务ID/分区名.img")
-        listOf("写入前强制备份：固定开启", "SHA-256 完整性校验：不可关闭", "动态/快照及未知目标：拒绝写入").forEach { guarantee ->
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
-                SymbolIcon(Symbol.Check, tint = MaterialTheme.colorScheme.primary)
-                Text(guarantee, Modifier.weight(1f))
-            }
-        }
-        WarningCard("AVB/回滚/机型兼容性未验证：必须显式确认风险")
-        ChoiceMenu("最低电量：${settings.minBattery}%", listOf("50", "60", "70", "80", "90", "100")) { vm.setBattery(it.toInt()) }
-        Text("电量至少 50%、温度 0–42°C 是本应用保守策略，不是 Android 官方统一标准。")
-        Toggle("写入要求连接电源", settings.requireCharging) { vm.setFlag("requireCharging", it) }
+        Text("手动读取仍检查目标、空间并生成 SHA-256 与元数据；并非写入前自动备份。")
+        WarningCard("直接 dd 写入只要求接受警告，不检查电量、温度、充电、容量、镜像格式、挂载/动态状态、槽位、Bootloader 或 AVB。旧版写入安全偏好不再生效。")
         Toggle("任务完成通知", settings.completionNotice) { vm.setFlag("completionNotice", it) }
-        Text("成功后不自动清理暂存；无任务且无写入互锁时可手动清理，永不自动删除备份。")
+        Text("不自动清理暂存；本进程无任务时可手动清理，永不自动删除备份。重开应用无法确认旧 dd 子进程状态，请勿在状态不明时清理或重试。")
         Toggle("显示高风险 / 未知分区", settings.showHighRisk) { vm.setFlag("showHighRisk", it) }
-        Toggle("显示更多诊断信息（不会绕过安全检查）", settings.verbose) { vm.setFlag("verbose", it) }
+        Toggle("显示更多诊断信息", settings.verbose) { vm.setFlag("verbose", it) }
         OutlinedButton(onClick = vm::cleanup, enabled = !busy) { ButtonSymbol(Symbol.Delete); Text("清理所有私有暂存镜像（保留备份）") }
-        WarningCard("真实写入仅限策略允许的普通物理分区与完整等长 raw。无专家绕过、批量刷写、任意 Shell 或后台自动刷写。进程状态不明时设备操作及清理被互锁禁止。")
+        WarningCard("写入使用固定 dd 命令，无风险拦截、持久写入互锁、自动备份或读回验证。不提供任意 Shell、自动重试、回滚、切槽或重启。系统拒绝或 I/O 错误仍会使命令失败，失败可能已经破坏目标。")
     }
 }
 @Composable
@@ -114,10 +106,10 @@ internal fun AboutScreen() {
             (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("开发者 QQ", "3895958954"))
         }) { ButtonSymbol(Symbol.Copy); Text("复制 QQ 3895958954") }
         Text("版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n构建类型 ${BuildConfig.BUILD_TYPE}\nAndroid API 26–35 设计目标；尚未真机验证")
-        Text("用途：本地分区发现、镜像检查、备份与受限 raw 写入。Root 用于主动授权后的设备访问，实际刷写需另外确认完整分区名及兼容性风险。Root 不等于 Bootloader 解锁。")
+        Text("用途：本地分区发现、手动备份与直接 dd 写入。Root 用于主动授权后的设备访问，刷写前显示警告与免责声明；确认后不进行兼容性或风险检查。Root 不等于 Bootloader 解锁。")
         WarningCard("错误镜像或错误分区可能导致设备无法启动、数据丢失或变砖。备份不代表一定能够恢复；命令成功或哈希一致不代表设备能正常启动。")
         Text("隐私：核心功能离线工作，无网络权限、广告或分析 SDK。镜像留在本机；暂存位于私有目录，备份位于下载目录，可能被其他应用或云同步访问。卸载会清除私有任务记录及暂存，不会清除下载目录备份。")
-        Text("兼容边界：需 Toybox 与 Root 写入组件普通文件自检通过。写入拒绝 userdata、整盘、RPMB、已挂载/映射/动态/Virtual A/B 对象；A/B 仅允许明确非当前槽。AVB、回滚和机型兼容性未验证。真实块设备写入尚未真机验收。")
+        Text("行为边界：写入已发现的 /dev/block 目标，文件字节原样交给 Toybox dd，不解压或展开 sparse；无自动备份及读回验证。保留命令参数转义和本进程串行任务，不代表安全保障。正式签名和版本号不代表真机兼容认证；真实写入尚未真机验收。")
         Text("Copyright (C) 昱yu · GPL-3.0-only。允许按 GPL v3 复制、修改及再分发；本程序不提供任何担保。\n源码：https://github.com/guo20120523/YU-Flash-Tool")
         OutlinedButton(onClick = { licenseAsset = "GPL-3.0.txt" }) { ButtonSymbol(Symbol.Description); Text("查看 GPL v3 许可证全文") }
         Text("图标：Google Material Symbols Rounded（Apache-2.0），以本地矢量资源离线提供；不是旧版 Material Icons 或字符替代图标。")

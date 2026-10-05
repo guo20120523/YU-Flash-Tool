@@ -3,6 +3,31 @@ plugins {
     kotlin("android") // version supplied by the root Kotlin plugin classpath
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val releaseSigningNames = listOf(
+    "YU_RELEASE_KEYSTORE", "YU_RELEASE_KEYSTORE_PASSWORD",
+    "YU_RELEASE_KEY_ALIAS", "YU_RELEASE_KEY_PASSWORD",
+)
+val releaseSigning = releaseSigningNames.associateWith { providers.environmentVariable(it).orNull }
+val hasReleaseSigning = releaseSigning.values.all { !it.isNullOrBlank() }
+
+// Validate only packaging/signing tasks: core tests, lint and debug builds need no secrets.
+val requireReleaseSigning = tasks.register("requireReleaseSigning") {
+    doLast {
+        val missing = releaseSigningNames.filter { releaseSigning[it].isNullOrBlank() }
+        check(missing.isEmpty()) {
+            "Release signing configuration missing: ${missing.joinToString()}. See docs/SIGNING.md."
+        }
+        check(file(releaseSigning.getValue("YU_RELEASE_KEYSTORE")!!).isFile) {
+            "Release keystore file does not exist. See docs/SIGNING.md."
+        }
+    }
+}
+tasks.configureEach {
+    if (name in setOf("packageRelease", "packageReleaseBundle", "signReleaseBundle", "assembleRelease", "bundleRelease", "validateSigningRelease")) {
+        dependsOn(requireReleaseSigning)
+    }
+}
+
 android {
     namespace = "io.yu.flash"
     compileSdk = 35
@@ -10,14 +35,31 @@ android {
         applicationId = "io.yu.flash"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.2.1-raw-preview"
+        versionCode = 5
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
-    buildTypes { release { isMinifyEnabled = false } }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("permanentRelease") {
+                storeFile = file(releaseSigning.getValue("YU_RELEASE_KEYSTORE")!!)
+                storeType = "PKCS12"
+                storePassword = releaseSigning.getValue("YU_RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSigning.getValue("YU_RELEASE_KEY_ALIAS")
+                keyPassword = releaseSigning.getValue("YU_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            isDebuggable = false
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("permanentRelease")
+        }
+    }
     // Preserve common upstream license resources rather than excluding them.
     packaging { resources.merges += setOf("META-INF/AL2.0", "META-INF/LGPL2.1") }
 }

@@ -10,8 +10,8 @@ class UiSmokeTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     @Test fun initialHomeDoesNotAutomaticallyRequestRoot() {
-        compose.onNodeWithText("了解用途并申请 Root").assertIsDisplayed()
-        compose.onNodeWithText("本地分区工具 · 安全预览版").assertIsDisplayed()
+        compose.onNodeWithText("一键获取分区表").assertIsDisplayed()
+        compose.onNodeWithText("本地分区工具 · 直接 dd 写入").assertIsDisplayed()
     }
 
     @Test fun allFourDestinationsAndAboutIdentityAreReachable() {
@@ -22,11 +22,11 @@ class UiSmokeTest {
         compose.onNodeWithText("关于", useUnmergedTree = true).performClick()
         compose.onNodeWithText("开发者：昱yu\nQQ：3895958954").assertIsDisplayed()
         compose.onNodeWithText("主页", useUnmergedTree = true).performClick()
-        compose.onNodeWithText("了解用途并申请 Root").assertIsDisplayed()
+        compose.onNodeWithText("一键获取分区表").assertIsDisplayed()
     }
 
     @Test fun activityRecreationKeepsApplicationUsableWithoutRoot() {
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("了解用途并申请 Root").assertIsDisplayed()
+        compose.onNodeWithText("一键获取分区表").assertIsDisplayed()
     }
 }

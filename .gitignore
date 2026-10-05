@@ -5,4 +5,12 @@ local.properties
 *.iml
 *.jks
 *.keystore
+*.p12
+*.pfx
 .yu-tools/
+.yu-private-signing/
+**/keystore-password.txt
+**/key-password.txt
+deliverables/
+__pycache__/
+*.pyc

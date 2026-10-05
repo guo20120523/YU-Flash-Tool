@@ -24,8 +24,6 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
     val operation by vm.operation.collectAsStateWithLifecycle()
     val prompt by vm.backupPrompt.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
-    val writePrompt by vm.writePrompt.collectAsStateWithLifecycle()
-    val checkingWrite by vm.checkingWrite.collectAsStateWithLifecycle()
     val nav = rememberNavController()
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route ?: "主页"
@@ -49,7 +47,7 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
                         SymbolIcon(Symbol.Flash, tint = MaterialTheme.colorScheme.primary)
                         Text("YU-Flash-Tool", style = MaterialTheme.typography.titleLarge)
                     }
-                    Text("本地分区工具 · 安全预览版", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("本地分区工具 · 直接 dd 写入", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } },
             bottomBar = { if (!wide) NavigationBar { pages.forEachIndexed { index, page ->
@@ -90,38 +88,27 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
                 vm.startBackup()
             }) { ButtonSymbol(Symbol.Download); Text("理解风险并备份") } }, dismissButton = { TextButton(onClick = { vm.backupPrompt.value = null }) { Text("取消") } })
     }
-    operation.imported?.takeIf { writePrompt == null }?.let { image ->
-        AlertDialog(onDismissRequest = { if (!checkingWrite) vm.dismissImport() }, icon = { SymbolIcon(Symbol.Description) }, title = { Text("镜像检查 · 尚未写入") }, text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
-                Text("目标：${operation.importTarget?.name}\n槽位：${operation.importTarget?.slot ?: "未知"}\n设备：${operation.importTarget?.device}\n容量：${operation.importTarget?.bytes} 字节")
-                Text("文档名：${image.displayName}\n实际长度：${image.bytes} 字节\n类型：${image.kind}\nSHA-256：${image.sha256}")
-                Text("强制备份目录：${settings.backupPath}")
-                WarningCard("仅支持未挂载、非动态/快照的普通物理分区与等容量 raw 镜像。AVB、回滚和设备兼容性未验证；通过检查也可能无法启动、数据丢失或变砖。")
-                Text("规范命名不会改变内容或兼容性。用户原始文档未修改；可在设置中清理私有暂存。")
-            }
-        }, confirmButton = { Button(onClick = vm::prepareWrite, enabled = !operation.busy && !checkingWrite) { ButtonSymbol(Symbol.Check); Text(if (checkingWrite) "检查中…" else "检查写入条件") } },
-            dismissButton = { TextButton(onClick = vm::dismissImport, enabled = !checkingWrite) { Text("关闭（不写入）") } })
-    }
-    writePrompt?.let { request ->
-        var typedName by remember(request) { mutableStateOf("") }
-        var accepted by remember(request) { mutableStateOf(false) }
-        AlertDialog(onDismissRequest = vm::cancelWrite, icon = { SymbolIcon(Symbol.Warning, tint = MaterialTheme.colorScheme.error) }, title = { Text("最终确认 · 真实覆盖分区") }, text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
-                Text("目标：${request.target.name}\n槽位：${request.target.slot ?: "非 A/B"}\n块设备：${request.target.device}\n身份：${request.target.identity}\n容量：${request.target.bytes} 字节")
-                Text("镜像：${request.image.kind} · ${request.image.bytes} 字节\nSHA-256：${request.image.sha256}\n强制备份目录：${request.location.path}\n剩余空间：${request.location.available} 字节")
-                WarningCard("写入后无法安全取消。失败可能留下部分改写的分区；不会自动重试、回滚、切槽、重启或关闭 AVB。备份和读回一致均不保证可启动或可恢复。")
-                Row {
-                    Checkbox(checked = accepted, onCheckedChange = { accepted = it })
-                    Text("我接受 AVB、回滚索引及设备兼容性未验证的风险，已准备外部救援方式。", Modifier.padding(top = 12.dp))
+    operation.imported?.let { image ->
+        var accepted by remember(image) { mutableStateOf(false) }
+        AlertDialog(onDismissRequest = vm::dismissImport,
+            icon = { SymbolIcon(Symbol.Warning, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("警告与免责声明 · 直接 dd 写入") }, text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
+                    Text("目标：${operation.importTarget?.name}\n块设备：${operation.importTarget?.device}\n分区容量（上次发现）：${operation.importTarget?.bytes} 字节\n文件实际长度：${image.bytes} 字节")
+                    WarningCard("确认后直接执行 dd 覆盖目标，不会自动备份，也不检查文件格式、容量、挂载、动态分区、槽位、Bootloader、AVB、回滚、机型、电量或温度。可能立即造成数据丢失、无法启动或永久损坏。")
+                    Text("sparse、压缩包及未知文件也会原样写入，不会解压或转换；短文件会保留尾部旧数据，超长文件可能在部分写入后失败。没有读回校验或恢复保证。")
+                    Text("本程序按现状提供，不提供任何担保。请自行核对目标与文件并准备救援方式。免责声明不能消除风险；dd / sync 返回 0 也不代表可启动。不会自动重试、回滚、切槽或重启。停止应用或系统终止不能保证 dd 子进程停止。")
+                    Row {
+                        Checkbox(checked = accepted, onCheckedChange = { accepted = it })
+                        Text("我已阅读警告与免责声明，并确认直接覆盖以上目标。", Modifier.padding(top = 12.dp))
+                    }
                 }
-                OutlinedTextField(value = typedName, onValueChange = { typedName = it }, singleLine = true,
-                    label = { Text("完整输入 ${request.target.name}（区分大小写）") }, modifier = Modifier.fillMaxWidth())
-            }
-        }, confirmButton = { Button(enabled = accepted && typedName == request.target.name && !operation.busy,
-            onClick = {
-                if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                vm.confirmWrite(typedName, accepted)
-            }) { ButtonSymbol(Symbol.Upload); Text("备份并真实写入") } }, dismissButton = { TextButton(onClick = vm::cancelWrite) { Text("取消，不写入") } })
+            }, confirmButton = {
+                Button(enabled = accepted && !operation.busy, onClick = {
+                    if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    vm.confirmWrite(accepted)
+                }) { ButtonSymbol(Symbol.Upload); Text("确认并直接写入") }
+            }, dismissButton = { TextButton(onClick = vm::dismissImport) { Text("取消，不写入") } })
     }
 }
 

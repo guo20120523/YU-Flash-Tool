@@ -36,9 +36,6 @@ internal class PartitionRepository(private val context: Context, val shell: Root
             result.checked()
             requireSafe(probe.length() == 4096L && result.output.lines().any { it.trim() == "4096" } &&
                 result.output.contains(ImageInspector.sha256(probe)), "Toybox 实际行为校验失败")
-            shell.run("CLASSPATH=${ShellArg.installedApk(context.applicationInfo.sourceDir)} /system/bin/app_process / io.yu.flash.root.RootWriter --probe ${ShellArg.path(context.cacheDir.path)}", 60).checked().let {
-                requireSafe(it == "YU_WRITER_READY", "Root 写入组件普通文件自检失败（未操作块设备）")
-            }
             toolsReady = true
         } finally { probe.delete() }
     }
@@ -90,7 +87,7 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val mapped = shell.run("for d in /sys/class/block/dm-*/dm/name; do [ ! -f \"${'$'}d\" ] || /system/bin/toybox cat \"${'$'}d\"; done; exit 0").checked()
         if (mapped.isNotBlank()) diagnostics += "发现独立 device-mapper 设备（不作为可写 by-name 对象）：\n${mapped.take(2048)}"
         if (partitions.isEmpty()) diagnostics += "没有可验证的 by-name 块设备；已限制探测范围为 /dev/block 的常见目录，未扫描整个文件系统"
-        diagnostics += "写入仅支持未使用的独立物理分区及等长 raw；动态/Virtual A/B 拒绝。AVB/回滚/机型兼容性未验证，不保证可启动。RPMB 在内容读取前排除。"
+        diagnostics += "分区类型与状态仅供显示。写入在警告确认后直接执行 dd，无自动备份、兼容性检查或读回校验。RPMB 在内容探测前排除。"
         return Discovery(partitions, environment(), diagnostics.joinToString("\n"))
     }
     suspend fun inspect(alias: String): Partition {

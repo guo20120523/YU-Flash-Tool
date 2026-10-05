@@ -1,95 +1,109 @@
 # 构建说明：优先使用 GitHub Actions
 
-[返回首页](<../README.md>) · [测试矩阵](<TEST_MATRIX.md>)
+[返回首页](<../README.md>) · [签名与密钥保管](<SIGNING.md>) · [测试矩阵](<TEST_MATRIX.md>)
 
-## 构建结果在哪里查看
+本指南说明工具链、构建步骤与发布流程，不维护某次构建的结果快照。每个版本的提交、APK、源码、测试和 Lint 结论以对应 [Releases 页面](https://github.com/guo20120523/YU-Flash-Tool/releases)及其附件为准。历史构建成功不等于当前提交或真机验收通过。
 
-本指南说明工具链、构建步骤与发布流程，不维护某次构建的结果快照。各版本的提交标识、APK、源码、测试与 Lint 结果以对应 [Releases 页面](https://github.com/guo20120523/YU-Flash-Tool/releases)及其附件为准。早期环境排障可查阅[历史验证记录](<VERIFICATION.md>)；历史成功不等于当前提交或设备验收通过。
+## 1. 项目和工具链
 
-## 1. 将项目内容上传到仓库根目录
+公开仓库：[guo20120523/YU-Flash-Tool](https://github.com/guo20120523/YU-Flash-Tool)。上传或 Fork 时保留隐藏目录，仓库根应直接包含[设置脚本](<../settings.gradle.kts>)、[根构建配置](<../build.gradle.kts>)、[应用构建配置](<../app/build.gradle.kts>)和[工作流](<../.github/workflows/android.yml>)，不要再套一层项目目录。
 
-已建立公开源码仓库：[guo20120523/YU-Flash-Tool](https://github.com/guo20120523/YU-Flash-Tool)。以下上传说明也适用于您自己的 Fork。
+不上传缓存、模块输出、本地 SDK、个人密钥/密码或本地 SDK 路径配置。见[忽略规则](<../.gitignore>)。私密签名备份必须在项目及公开上传器范围之外；忽略规则不能替代上传器范围检查。
 
-上传 `YU-Flash-Tool` 目录**里面的内容**，而不是让仓库根目录再套一层 `YU-Flash-Tool` 文件夹。需要保留隐藏目录 `.github`。特别检查上传工具是否遗漏点开头的目录。根目录应直接包含以下文件及目录：
-
-- [settings.gradle.kts](<../settings.gradle.kts>)、[build.gradle.kts](<../build.gradle.kts>)、[gradle.properties](<../gradle.properties>)；
-- 应用与核心模块（可用[应用构建配置](<../app/build.gradle.kts>)、[核心构建配置](<../core/build.gradle.kts>)确认层级）；
-- [README.md](<../README.md>)、本说明等文档；
-- **[.github/workflows/android.yml](<../.github/workflows/android.yml>) 必须位于仓库根目录对应路径。**
-
-不上传本机 `.gradle` 缓存、模块 `build` 输出、SDK、个人签名密钥、密码或本机 `local.properties`。忽略规则见[.gitignore](<../.gitignore>)。工程已用 Gradle 8.11.1 生成 [Gradle Wrapper 配置](<../gradle/wrapper/gradle-wrapper.properties>)、[Linux/macOS 启动脚本](<../gradlew>) 和 [Windows 启动脚本](<../gradlew.bat>)。CI 仍用 `setup-gradle` 提供 `gradle` 命令；本地可用 Wrapper（Linux 上传后可能需要 `chmod +x gradlew`）。
-
-## 2. 启动当前工作流
-
-1. 打开该仓库的 **Actions**，按仓库策略启用工作流。
-2. 找到 **Android safety-preview build**。
-3. 默认分支上已有工作流后，可用 **Run workflow** 手动触发（`workflow_dispatch`）。当前也配置了对 `main`、`master` 的 push，以及 pull request 触发。
-4. 展开各步骤，确认 SDK 检查、核心测试、Android Lint 和 APK 构建的实际结论。仅看到工作流文件或排队状态不算通过。
-
-工作流当前顺序：
-
-| 阶段 | 配置行为 |
+| 工具 | 固定要求 |
 | --- | --- |
-| Runner | `ubuntu-24.04`，任务超时 30 分钟，仓库权限 `contents: read` |
-| 检出源码 | `actions/checkout@v4` |
-| Java | `actions/setup-java@v4`，Temurin 17 |
-| Gradle | `gradle/actions/setup-gradle@v4`，Gradle **8.11.1** |
-| 独立核心验证 | 先运行 `gradle -PcoreOnly=true :core:test --no-daemon --console=plain`，避免 SDK 缺失掩盖核心测试证据 |
-| SDK 前置检查 | 检查 `ANDROID_HOME`、`platforms/android-35/android.jar`、`build-tools/35.0.0`，写入 runner 的 `local.properties` |
-| Android 验证与构建 | `gradle :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --console=plain` |
-| 验证证据 | `if: always()` 上传 `YU-Flash-Tool-verification`；无文件时警告，不凭空生成报告 |
-| APK 与对应材料 | 前序成功后上传 `YU-Flash-Tool-debug-apk`；包含主/测试 APK、对应源码、报告 ZIP、构建身份、发布说明、许可与摘要 |
-| 独立发布任务 | 依赖构建成功，仅 main/master 非 PR 运行；此任务单独授予 `contents: write`，核对摘要后创建草稿预发布、上传全部附件再公开 |
+| Runner | `ubuntu-24.04`，构建超时 40 分钟 |
+| JDK | Temurin 17 |
+| Gradle | 8.11.1，CI 由 `gradle/actions/setup-gradle@v4` 提供 |
+| Android Gradle Plugin | 8.9.2 |
+| Kotlin / Compose 编译插件 | 2.1.20 |
+| SDK | Platform 35，验证用 Build Tools 35.0.0 |
+| 当前发行身份 | `io.yu.flash`，`1.0.0`，版本码 `5`；持久 RSA-4096 证书 |
 
-**SDK 检查步骤不安装 SDK、不自动接受许可证。** runner 环境不满足要求时应失败；不要将它描述为会自动补全环境。须由维护者检查 runner 镜像实际内容及 SDK 许可条件后处理。
+本地 Wrapper 见[配置](<../gradle/wrapper/gradle-wrapper.properties>)、[Unix 启动脚本](<../gradlew>)和[Windows 启动脚本](<../gradlew.bat>)。它们仍需要 Java 并可能下载 Gradle。**磁盘紧张的维护机不需要为了设置签名重装 JDK、Gradle 或 SDK；优先云端构建。**
 
-## 3. 下载产物并核验证据
+## 2. 工作流入口与信任边界
 
-成功运行后，在该次运行页面的 Artifacts 中查找：
+在仓库 Actions 找到 **Android signed release build**。触发条件为 `main`/`master` push、pull request，或手动 `workflow_dispatch`。仅 `main`/`master` 且非 PR 的运行可以解码签名密钥、产出官方签名包并发布；其他分支与 PR 只检查核心、图标、Lint 和 Debug 编译，不依赖秘密。
 
-- `YU-Flash-Tool-verification`：配置收集核心测试 HTML/XML 报告与 Android Debug Lint 报告。失败发生太早时可能不存在部分报告；上传步骤执行过不等于测试通过。
-- `YU-Flash-Tool-debug-apk`：成功构建才上传，包含主/测试 APK、对应提交源码 ZIP、验证报告 ZIP、构建身份、发布说明、许可与摘要；测试 APK 不是主应用。
+签名前先由维护者按[签名说明](<SIGNING.md>)配置四个 `YU_RELEASE_*` Secrets。工作流不生成、旋转或公开私钥。创建/修改工作流文件本身不算构建已运行，更不代表已出包；应查看真实运行步骤结论。
 
-成功的主分支构建还会在 [Releases](https://github.com/guo20120523/YU-Flash-Tool/releases) 创建 `preview-<运行序号>-<尝试次数>` 独立预发布，便于直接下载，无需只依赖有保存期限的 Actions artifact。发布说明由[说明源文档](<RELEASE_NOTES.md>)与[生成脚本](<../scripts/release_notes.py>)组合，附该次真实测试/Lint统计、提交和附件哈希。维护者每次功能更新须同步说明源文档，不能把自动统计误当成自动生成完整功能变更。
+| 阶段 | 行为与失败条件 |
+| --- | --- |
+| 检出与工具链 | `actions/checkout@v4` 不保留 Git 凭据；配置 Java 和 Gradle |
+| 离线图标校验 | `python3 scripts/verify_symbols.py`，校验固定资源及许可 |
+| 独立核心测试 | `gradle -PcoreOnly=true :core:test --no-daemon --console=plain`，不因 Android SDK 缺失掩盖核心结果 |
+| SDK 前置检查 | 检查 Platform 35 及 Build Tools 35.0.0 的 `apksigner`/`aapt`；只写 runner SDK 路径配置 |
+| 全分支检查 | `gradle :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --console=plain` |
+| 主分支签名 | 仅非 PR 的 main/master：密钥恢复至 runner 临时目录，`gradle :app:lintRelease :app:assembleRelease --no-daemon --no-configuration-cache --console=plain` |
+| 私密清理 | `always()` 删除临时 PKCS12；不上传含密钥/密码的目录 |
+| 证据上传 | `always()` 收集真实核心 XML/HTML 与 Debug/Release Lint 报告；早期失败时可能不齐全 |
+| APK 身份复核 | `apksigner verify --verbose --print-certs` 必须通过，唯一证书指纹须匹配公开固定值；`aapt` 与 Gradle 输出元数据共同确认包名、版本和非 Debuggable |
+| 发布材料 | 同一提交的源码 ZIP、APK、报告 ZIP、构建身份、动态发布说明、许可、公开指纹及 SHA-256 摘要 |
+| 独立正式发布 | 依赖前序全部成功，仅发布任务拥有 `contents: write`；重新检查摘要，先草稿上传全部材料再公开为非预发布 |
 
-下载前记录提交标识、运行编号、任务结论、测试实际执行/失败/跳过数量及 Lint 结果。测试数量可能随源码变化，应以对应提交的报告为准。Debug APK 仅用于受控验证，不是发布签名包，不构成真机安全认证。安装后也不会开放真实写入。
+**SDK 检查不安装 SDK、不自动接受许可证。** runner 不满足前置条件时应明确失败，由维护者检查镜像与许可后处理，不能描述成自动补全环境。
 
-## 4. 本地构建（可选，前置工具已具备时）
+## 3. 每次成功主分支运行保留独立 Release
 
-版本依据[根构建配置](<../build.gradle.kts>)、[应用构建配置](<../app/build.gradle.kts>)和[工作流](<../.github/workflows/android.yml>)：
+每次成功运行使用唯一标签 `release-<运行序号>-<尝试次数>`，标题标明 **YU-Flash-Tool 1.0.0 · 正式签名构建**，不是 prerelease。后续运行不覆盖已有构建；重跑产生新的尝试标签。若上传中断，保留草稿供维护者调查，不把未上传完整的构建公开。
 
-- JDK 17；Gradle 8.11.1。
-- Android Gradle Plugin 8.9.2；Kotlin / Compose 编译插件 2.1.20。
-- Android SDK Platform 35；CI 明确检查 Build Tools 35.0.0。
-- 能访问配置的 Google Maven、Maven Central 与 Gradle Plugin Portal。实际依赖下载及工具许可由执行者处理。
+不自动创建或移动 `v1.0.0` 别名，避免重复主分支构建、并发运行或重试争用同一版本标签。每次发行的精确身份以完整提交和独立运行标签为准；需要语义版本标签时，维护者应在验收后单独指定提交。
 
-在工程根目录，使用已有环境执行与 CI 一致的命令：
+“正式”描述签名/发行渠道，**不是兼容性、稳定性或刷写安全认证**。本应用包含实验性真实 raw 写入；云端编译/模拟测试不等于设备安全验收。
+
+### 可下载材料
+
+- `YU-Flash-Tool-verification`：Actions artifact，核心测试及 Lint 的真实报告。失败运行也可能有部分证据，不能只凭 artifact 存在认定成功。
+- `YU-Flash-Tool-debug-validation`：仅 PR/非发布分支的 Debug APK 和测试 APK，不作为官方 Release 发布。
+- `YU-Flash-Tool-signed-release`：成功主分支签名构建的完整交付 artifact，同时发布至独立 Release：
+  - `YU-Flash-Tool.apk`：主应用，持久签名且非 Debuggable；不再用 Debug 包作主附件。
+  - `YU-Flash-Tool-androidTest.apk`：Debug 仪器测试包，仅编译，不是主应用，也不能直接当作签名 Release 的仪器验收证据。
+  - `YU-Flash-Tool-source.zip`：同一提交通过 `git archive` 导出的源码。
+  - `YU-Flash-Tool-verification.zip`：本次核心测试与 Debug/Release Lint 报告。
+  - `BUILD-INFO.txt`：提交、运行、版本、签名指纹、工具链与验证边界。
+  - `APKSIGNER.txt`、`APK-BADGING.txt`、`SIGNING-CERTIFICATE-SHA256.txt`：签名与 APK 元数据证据、公开证书指纹。
+  - `RELEASE-NOTES.md`、`LICENSE`、`THIRD_PARTY_NOTICES.md`：本次详细说明与许可。
+  - `SHA256SUMS.txt`：除摘要表自身外所有交付文件的 SHA-256。
+
+[发布说明生成器](<../scripts/release_notes.py>)读取本次核心测试 XML，计算真实通过/失败/错误/跳过数量，并分别读取 Debug/Release Lint 实际错误和警告。缺报告、零通过、测试失败、Lint 错误、缺附件或签名/版本证据不符时拒绝生成说明。仪器测试明确记为**编译完成、未执行**，不固定测试数量，不把旧计数当成新证据。[人工说明源](<RELEASE_NOTES.md>)仅在标题与 `1.0.0` 匹配时合并，否则采用当前正式签名说明，避免混入旧 Debug 下载指引；功能变更叙述仍由维护者负责。
+
+下载后先记录完整提交、运行结论与测试/Lint数据，然后运行：
 
 ```text
-gradle :core:test :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --console=plain
+sha256sum --check SHA256SUMS.txt
+apksigner verify --verbose --print-certs YU-Flash-Tool.apk
 ```
 
-若只运行 JVM 核心测试，可利用[设置脚本](<../settings.gradle.kts>)中的 `coreOnly` 开关排除 Android 模块：
+证书指纹必须匹配[公开签名身份](<SIGNING.md>)。旧 Debug 预览签名不同，通常不能覆盖安装；尤其有写入意图/不确定状态时，不要为绕过签名冲突卸载、清数据或盲目重启。
+
+## 4. 本地验证（仅工具链已经具备时）
+
+无需密钥的核心、Lint、Debug 和仪器测试编译：
 
 ```text
 gradle -PcoreOnly=true :core:test --no-daemon --console=plain
+gradle :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --console=plain
 ```
 
-本机 Windows 原生 GBK 编码且工程路径含中文时，Java 17 读取 Gradle UTF-8 参数文件曾导致 worker 类找不到；本次已验证的命令行解决方案如下（仅本机使用，不改变项目默认 UTF-8 或 Linux CI）：
+Android 构建仍需要 SDK，核心 JVM 测试仍需要 Java/Gradle 及依赖。访问 Google Maven、Maven Central 和 Gradle Plugin Portal 与下载许可由执行者负责。
+
+Windows 原生 GBK 且项目路径含中文时，历史上 Java 17 读取 Gradle UTF-8 参数文件曾导致 worker 类找不到，可仅在遇到该已识别故障的本机命令中使用：
 
 ```text
 gradle -PcoreOnly=true :core:test "-Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=GBK" --no-daemon --console=plain
 ```
 
-此命令仍需要 JDK、Gradle 及核心依赖；**核心测试成功也不能证明 Android 编译或硬件行为正确**。构建任务只编译 Android 仪器测试 APK，不执行其中的 UI 测试，也不执行真机测试。要运行仪器测试，须另有模拟器或设备并执行 `gradle :app:connectedDebugAndroidTest`；测试不申请 Root、不执行设备读取或写入。
+已有安全环境配置的签名构建方法见[签名说明](<SIGNING.md>)；缺少秘密的 Release 打包任务必须失败，不降级为 Debug 或未签名包。**本流水线没有执行仪器测试**。运行仪器测试需另行具备模拟器/设备与明确验收安排，不纳入本次签名构建授权，也没有设备访问。
 
-## 5. 常见失败的解释
+## 5. 常见失败与发布纪律
 
-- **Actions 中没有工作流**：检查上传层级、是否遗漏 `.github`、工作流是否在所需分支、仓库权限/Actions 设置。
-- **SDK 检查失败**：核实 runner SDK 和环境变量，不跳过检查来伪造通过。
-- **依赖/插件下载失败**：区分网络、仓库或版本解析问题；保存日志，不报告编译成功。
-- **核心测试失败或挂起**：收集已有测试报告与日志，标记失败/待确认，不以方法数代替通过数。
-- **Lint 或 Android 编译失败**：保留实际错误，由维护者修复；不能把只通过 JVM 测试的状态写成已出包。
-- **验证产物存在但无 APK**：这是可能的失败运行状态，必须查看构建步骤。
+- Actions 没有工作流：检查仓库层级、隐藏目录、分支和仓库策略。
+- Secret 名称存在但签名失败：名称检查无法读回验证秘密值；核对受限备份的公开指纹、别名和 PKCS12 兼容性，不重新生成密钥试错。
+- SDK/依赖/插件下载失败：记录真实错误，不跳过检查或宣称编译成功。
+- 核心测试或 Lint 失败：保留实际报告，不以测试方法数、旧截图或之前运行替代当前证据。
+- 签名指纹、包名、版本或 Debuggable 检查失败：停止发布，调查构建输入和签名身份。
+- 有报告而无 APK：可能是部分失败运行，须看实际构建步骤。
+- Release 仍是草稿：本次发布未完成，不应宣传为已公开发行；新的工作流尝试保留新的标签，不覆盖历史材料。
 
-发布前还需完成[第三方声明中的许可证核验](<../THIRD_PARTY_NOTICES.md>)及[测试矩阵](<TEST_MATRIX.md>)。本指南不虚构项目主页、下载站或仓库地址。
+发布前还需核对[第三方许可](<../THIRD_PARTY_NOTICES.md>)、[安全设计](<SAFETY_DESIGN.md>)及[测试矩阵](<TEST_MATRIX.md>)。固定密钥解决发行身份连续性，不解决设备风险。

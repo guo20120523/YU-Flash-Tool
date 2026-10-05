@@ -36,8 +36,8 @@ class HomeScrollTest {
         compose.onNodeWithText("test_0").assertIsDisplayed()
         list.performScrollToNode(hasText("test_29"))
         compose.onNodeWithText("test_29").assertIsDisplayed()
-        list.performScrollToNode(hasText("查看检测诊断 · 写入受安全限制"))
-        compose.onNodeWithText("查看检测诊断 · 写入受安全限制").assertIsDisplayed()
+        list.performScrollToNode(hasText("查看分区表诊断"))
+        compose.onNodeWithText("查看分区表诊断").assertIsDisplayed()
         list.performScrollToNode(hasText("搜索分区名称"))
         compose.onNodeWithText("搜索分区名称").assertIsDisplayed()
     }

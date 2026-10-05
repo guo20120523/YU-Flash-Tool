@@ -63,9 +63,9 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
         Text("分区", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = Spacing.small))
         Text("${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE}\nRoot：${home.root} · 当前槽位：${home.environment?.slot ?: "未知"}", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
-            Button(onClick = vm::refresh, enabled = !home.loading && !busy) { ButtonSymbol(Symbol.Refresh); Text(if (home.root == RootState.NOT_REQUESTED) "了解用途并申请 Root" else "重新检测 / 刷新") }
+            Button(onClick = vm::refresh, enabled = !home.loading && !busy) { ButtonSymbol(Symbol.Refresh); Text("一键获取分区表") }
         }
-        if (home.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在只读检查 Root、工具和分区，请等待授权…") }
+        if (home.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取分区表") }
         home.error?.let { WarningCard(it) }
         if (settings.verbose) Text(home.diagnostics, style = MaterialTheme.typography.bodySmall)
         } }
@@ -106,13 +106,13 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
                                 modifier = Modifier.semantics { contentDescription = "读取并备份 ${partition.name}" }) { ButtonSymbol(Symbol.Download); Text("读取") }
                             4 -> TextButton(onClick = { selectedIdentity = partition.identity; chooser.launch(arrayOf("*/*")) }, enabled = !busy,
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择镜像，检查后需另行确认真实写入" }) { ButtonSymbol(Symbol.Upload); Text("写入检查") }
+                                modifier = Modifier.semantics { contentDescription = "为 ${partition.name} 选择文件，警告确认后直接 dd 写入" }) { ButtonSymbol(Symbol.Upload); Text("写入") }
                         } }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
             item(key = "diagnostics") {
-                TextButton(onClick = { vm.message.value = home.diagnostics }) { ButtonSymbol(Symbol.Info); Text("查看检测诊断 · 写入受安全限制") }
+                TextButton(onClick = { vm.message.value = home.diagnostics }) { ButtonSymbol(Symbol.Info); Text("查看分区表诊断") }
             }
         }
     }
@@ -121,7 +121,7 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
             Text("容量：${p.bytes} 字节\n类型：${p.kind.label()}\n块设备：${p.device}\n设备号：${p.identity}\n槽位：${p.slot ?: "未知/非 A/B"}\n风险：${p.risk}\n挂载：${p.mounted}\n映射/持有者：${p.mapped}")
             Text("路径来源 / 重复别名：\n${p.aliases.joinToString("\n")}")
             Text("读取策略：${runCatching { SafetyPolicy.backup(p); "允许进入确认，执行前再次检查" }.exceptionOrNull()?.message ?: "允许进入确认"}")
-            Text("写入：仅允许独立、未挂载的普通物理分区与完整等长 raw。需强制备份、确认完整名称及未验证的 AVB/回滚/机型兼容性风险；名称与容量匹配不保证可启动。")
+            Text("写入：选择文件并接受警告后直接执行 dd。无自动备份、风险检查、容量/格式检查或读回校验。此处信息仅供查看，不会阻止写入；请自行承担误写、数据丢失及无法启动风险。")
         }
     }, confirmButton = { TextButton(onClick = { detail = null }) { Text("关闭") } }) }
 }

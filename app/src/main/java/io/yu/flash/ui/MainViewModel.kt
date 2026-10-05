@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.*
 
 internal data class HomeState(val root: RootState = RootState.NOT_REQUESTED, val loading: Boolean = false,
     val partitions: List<Partition> = emptyList(), val environment: Environment? = null,
-    val diagnostics: String = "Root 用于只读检测、分区读取和受限写入。仅在您主动授权后执行命令。", val error: String? = null)
+    val diagnostics: String = "点击一键获取分区表", val error: String? = null)
 internal class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = (application as YuApplication).graph
     val home = MutableStateFlow(HomeState())
@@ -24,41 +24,17 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
     val operation = graph.operations.flow
     val backupPrompt = MutableStateFlow<Pair<Partition, BackupLocation>?>(null)
     val message = MutableStateFlow<String?>(null)
-    val writePrompt = MutableStateFlow<ConfirmedWrite?>(null)
-    val checkingWrite = MutableStateFlow(false)
-    fun prepareWrite() {
-        if (checkingWrite.value || operation.value.busy) return
+    fun confirmWrite(accepted: Boolean) {
+        if (!accepted || operation.value.busy) return
         val image = operation.value.imported ?: return
         val target = operation.value.importTarget ?: return
-        checkingWrite.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try { graph.gate.exclusive {
-                graph.device.interlock.check()
-                val (fresh, environment) = graph.device.refresh(target)
-                requireSafe(SafetyPolicy.sameTarget(target, fresh), "目标改变，请重新检测并导入")
-                val preferences = settings.value
-                val safety = SafetySettings(preferences.minBattery, preferences.requireCharging)
-                SafetyPolicy.write(fresh, image, environment, safety)
-                val location = graph.device.location(preferences.backupPath)
-                requireSafe(location.available >= Math.addExact(fresh.bytes, 64L * 1024 * 1024), "备份空间不足")
-                writePrompt.value = ConfirmedWrite(fresh, image, environment, location, "", safety, false)
-            } } catch (e: Exception) { message.value = e.message }
-            finally { checkingWrite.value = false }
-        }
+        start(Operation.Flash(DirectWriteRequest(target, image, acknowledged = true)))
     }
-    fun confirmWrite(name: String, accepted: Boolean) {
-        val prompt = writePrompt.value ?: return
-        if (!accepted || name != prompt.target.name || operation.value.busy) return
-        writePrompt.value = null
-        start(Operation.Flash(prompt.copy(typedName = name, confirmed = true, compatibilityRiskAccepted = accepted)))
-    }
-    fun cancelWrite() { writePrompt.value = null }
     fun refresh() {
         if (home.value.loading || operation.value.busy) return
         home.value = home.value.copy(loading = true, error = null)
         viewModelScope.launch(Dispatchers.IO) {
             try { graph.gate.exclusive {
-                graph.device.interlock.check()
                 if (home.value.root != RootState.READY) graph.partitions.authorize()
                 val result = graph.partitions.discover()
                 home.value = HomeState(RootState.READY, partitions = result.partitions, environment = result.environment, diagnostics = result.diagnostics)
@@ -103,7 +79,6 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
         if (operation.value.busy) { message.value = "任务运行时禁止清理"; return@launch }
         try {
             graph.gate.exclusive {
-                graph.device.interlock.check()
                 val staging = java.io.File(getApplication<Application>().filesDir, "staging")
                 val ok = !staging.exists() || staging.deleteRecursively()
                 dismissImport(); message.value = if (ok) "私有暂存已清理；未删除任何备份" else "部分暂存清理失败"
