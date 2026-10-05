@@ -75,6 +75,6 @@ sha256sum --check SHA256SUMS.txt
 apksigner verify --verbose --print-certs YU-Flash-Tool.apk
 ```
 
-输出的唯一 signer 证书 SHA-256 必须等于本页指纹。CI 还核对 `io.yu.flash`、版本 `1.0.0`、版本码 `5` 与不可调试属性，附件保留签名与 APK 元数据输出。
+输出的唯一 signer 证书 SHA-256 必须等于本页指纹。CI 还核对 `io.yu.flash`、版本 `1.0.1`、版本码 `6` 与不可调试属性，附件保留签名与 APK 元数据输出。
 
 旧 Debug 预览使用不同签名，通常**不能直接覆盖安装**。不要为绕过冲突贸然卸载、清数据或重启，尤其存在写入意图、未解决事务或不确定状态时。先保留日志、备份和独立救援方式，按[安全设计](<SAFETY_DESIGN.md>)处理；这不是提供清除安全状态的捷径。未来同一签名仍须遵守 Android 版本码升级规则，每次真正版本升级要提升版本码。

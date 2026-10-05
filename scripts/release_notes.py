@@ -70,7 +70,7 @@ def generate(root=ROOT, env=None):
         raise ValueError('Signer evidence does not match expected public certificate')
     badging = (output / 'APK-BADGING.txt').read_text(encoding='utf-8')
     package = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", badging, re.M)
-    if not package or package.groups() != ('io.yu.flash', '5', '1.0.0'):
+    if not package or package.groups() != ('io.yu.flash', '6', '1.0.1'):
         raise ValueError('APK identity/version mismatch')
     if re.search(r'^application-debuggable(?:\s|$)', badging, re.M):
         raise ValueError('Debuggable APK cannot be a formal release')
@@ -78,14 +78,14 @@ def generate(root=ROOT, env=None):
         'GITHUB_REPOSITORY', 'GITHUB_SHA', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT'))
     server = env.get('GITHUB_SERVER_URL', 'https://github.com').rstrip('/')
     editorial = (root / 'docs/RELEASE_NOTES.md').read_text(encoding='utf-8')
-    # Do not append stale preview instructions or fixed old test counts to 1.0.0.
+    # Do not append stale preview instructions or fixed old test counts to 1.0.1.
     # Maintainers own the feature narrative; this script owns per-run evidence.
-    if re.match(r'^#\s+1\.0\.0(?:\s|·|$)', editorial):
+    if re.match(r'^#\s+1\.0\.1(?:\s|·|$)', editorial):
         notes = editorial.rstrip() + '\n'
     else:
-        notes = '''# 1.0.0 · 正式签名发行
+        notes = '''# 1.0.1 · 正式签名发行
 
-- 版本码 5，应用包名 `io.yu.flash`，主附件为 `YU-Flash-Tool.apk`。
+- 版本码 6，应用包名 `io.yu.flash`，主附件为 `YU-Flash-Tool.apk`。
 - 使用持久 RSA-4096 发布证书，构建后验证签名身份、版本和非 Debuggable 属性。
 - 每次成功主分支运行分别保留源码、报告、许可、摘要与独立正式 Release，不覆盖历史构建。
 - “正式签名”描述发行方式，不代表真机兼容性、稳定性或刷写安全已经验收。
@@ -111,11 +111,11 @@ def generate(root=ROOT, env=None):
 - Android Release Lint：{lint['release']['errors']} 错误、{lint['release']['warnings']} 警告、{lint['release']['other']} 其他记录。完整报告见附件。
 - 主 Release APK 与 Debug 仪器测试 APK 已编译；仪器测试**未执行**，不宣称 UI/视觉或真机测试通过。
 - APK 已通过 `apksigner verify`；唯一签名证书 SHA-256：`{fingerprint}`。
-- 主 APK 的包名 `io.yu.flash`、版本 `1.0.0`、版本码 `5` 与非 Debuggable 属性已核对。
+- 主 APK 的包名 `io.yu.flash`、版本 `1.0.1`、版本码 `6` 与非 Debuggable 属性已核对。
 
 ## 签名与安装注意
 
-这是新的固定发布证书，与旧 Debug 预览签名不同，通常不能直接覆盖安装旧预览。
+沿用 1.0.0 的固定发布证书，版本码递增；符合 Android 更新条件时可覆盖已安装的同签名正式版。与旧 Debug 预览签名不同，通常不能直接覆盖安装旧预览。
 不要因为签名冲突贸然卸载或清数据，尤其有写入意图、未解决事务或不确定状态时；先保留记录、备份与独立救援方式。
 同证书与版本规则是后续正常更新的必要条件，不是设备兼容性或刷写安全保证。
 

@@ -36,7 +36,7 @@ internal class OperationController(private val graph: AppGraph) {
         val target = when (operation) { is Operation.Read -> operation.target; is Operation.Import -> operation.target; is Operation.Flash -> operation.request.target }
         suspend fun stage(s: Stage, message: String) {
             graph.journal.append(Event(id, s, target.name, target.slot, summary = message))
-            state.value = state.value.copy(phase = message); phase(message)
+            state.value = state.value.copy(phase = message); runCatching { phase(message) }
         }
         try {
             graph.recovered.await()
@@ -58,20 +58,24 @@ internal class OperationController(private val graph: AppGraph) {
                     state.value = OperationState(busy = true, phase = "文件已暂存，等待警告确认", bytes = image.bytes, imported = image, importTarget = target)
                 }
                 is Operation.Flash -> {
-                    DirectFlash(io.yu.flash.root.DirectDdWriter(graph.partitions.shell), object : AuditLog {
+                    DirectFlash(io.yu.flash.root.DirectDdWriter(graph.context, graph.partitions, graph.device), object : AuditLog {
                         override suspend fun append(event: Event) {
                             id = event.taskId // Any controller-level failure belongs to the same transaction.
                             graph.journal.append(event)
                             if (event.stage in setOf(Stage.SUCCESS, Stage.FAILED, Stage.INTERRUPTED)) terminalRecorded = true
                             val label = when(event.stage) {
+                                Stage.BACKUP -> "写前完整备份 · 不可跳过"
+                                Stage.BACKUP_VERIFY -> "复核完整备份 SHA-256"
+                                Stage.RECHECK -> "计算暂存文件 SHA-256"
                                 Stage.WRITING -> "dd 写入中 · 中断可能损坏分区"; Stage.SYNCING -> "执行 sync"
-                                Stage.SUCCESS -> "dd / sync 返回 0，未验证内容"
+                                Stage.READBACK -> "读回写入范围并比对 SHA-256"
+                                Stage.SUCCESS -> "写入范围读回一致，备份已保留"
                                 else -> event.stage.name
                             }
-                            state.value = state.value.copy(phase = label, bytes = event.bytes); phase(label)
+                            state.value = state.value.copy(phase = label, bytes = event.bytes); runCatching { phase(label) }
                         }
                     }, graph.gate).execute(operation.request)
-                    state.value = OperationState(busy = true, phase = "dd / sync 返回 0，未验证内容或可启动性", bytes = operation.request.image.bytes)
+                    state.value = OperationState(busy = true, phase = "备份完成且写入范围读回一致；不保证可启动", bytes = operation.request.image.bytes)
                 }
             }
         } catch (e: Exception) {

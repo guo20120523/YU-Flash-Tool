@@ -110,7 +110,7 @@ jobs:
               raise SystemExit('Unexpected release signer; refusing publication')
           badging = Path('deliverables/APK-BADGING.txt').read_text()
           match = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", badging, re.M)
-          if not match or match.groups() != ('io.yu.flash', '5', '1.0.0'):
+          if not match or match.groups() != ('io.yu.flash', '6', '1.0.1'):
               raise SystemExit('APK package/version does not match release contract')
           if re.search(r'^application-debuggable(?:\s|$)', badging, re.M):
               raise SystemExit('Release APK is debuggable')
@@ -118,7 +118,7 @@ jobs:
           elements = metadata.get('elements', [])
           if metadata.get('applicationId') != 'io.yu.flash' or metadata.get('variantName') != 'release' or len(elements) != 1:
               raise SystemExit('Unexpected release output metadata')
-          if elements[0].get('versionCode') != 5 or elements[0].get('versionName') != '1.0.0' or elements[0].get('outputFile') != 'app-release.apk':
+          if elements[0].get('versionCode') != 6 or elements[0].get('versionName') != '1.0.1' or elements[0].get('outputFile') != 'app-release.apk':
               raise SystemExit('Release metadata version/file mismatch')
           Path('deliverables/SIGNING-CERTIFICATE-SHA256.txt').write_text(
               f'YU-Flash-Tool permanent release certificate SHA-256: {expected}\n'
@@ -126,7 +126,7 @@ jobs:
           PY
           zip -r deliverables/YU-Flash-Tool-verification.zip core/build/reports/tests core/build/test-results app/build/reports/lint-results-debug.* app/build/reports/lint-results-release.*
           git archive --format=zip --output=deliverables/YU-Flash-Tool-source.zip HEAD
-          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nRun number/attempt: %s/%s\nVersion: 1.0.0 (5)\nPackage: io.yu.flash\nType: permanently signed release; non-debuggable\nCertificate SHA-256: %s\nToolchain: Temurin 17; Gradle 8.11.1; AGP 8.9.2; Kotlin 2.1.20; SDK 35; verification Build Tools 35.0.0\nInstrumentation APK: compiled only, NOT executed\nHardware/Root/write/compatibility/stability validation: NOT performed by this build\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" "$YU_RELEASE_CERT_SHA256" > deliverables/BUILD-INFO.txt
+          printf 'Repository: %s\nCommit: %s\nRun: %s/%s/actions/runs/%s\nRun number/attempt: %s/%s\nVersion: 1.0.1 (6)\nPackage: io.yu.flash\nType: permanently signed release; non-debuggable\nCertificate SHA-256: %s\nToolchain: Temurin 17; Gradle 8.11.1; AGP 8.9.2; Kotlin 2.1.20; SDK 35; verification Build Tools 35.0.0\nInstrumentation APK: compiled only, NOT executed\nHardware/Root/write/compatibility/stability validation: NOT performed by this build\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" "$YU_RELEASE_CERT_SHA256" > deliverables/BUILD-INFO.txt
           cp LICENSE THIRD_PARTY_NOTICES.md deliverables/
           python3 scripts/release_notes.py
           (cd deliverables && sha256sum -- * > SHA256SUMS.txt.tmp && mv SHA256SUMS.txt.tmp SHA256SUMS.txt && sha256sum --check SHA256SUMS.txt)
@@ -163,6 +163,6 @@ jobs:
           # Draft first: incomplete upload is not advertised as a published release.
           gh release create "$tag" deliverables/* \
             --target "$GITHUB_SHA" --draft \
-            --title "YU-Flash-Tool 1.0.0 · 正式签名构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
+            --title "YU-Flash-Tool 1.0.1 · 正式签名构建 ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             --notes-file deliverables/RELEASE-NOTES.md
           gh release edit "$tag" --draft=false --prerelease=false

@@ -87,7 +87,7 @@ internal class PartitionRepository(private val context: Context, val shell: Root
         val mapped = shell.run("for d in /sys/class/block/dm-*/dm/name; do [ ! -f \"${'$'}d\" ] || /system/bin/toybox cat \"${'$'}d\"; done; exit 0").checked()
         if (mapped.isNotBlank()) diagnostics += "发现独立 device-mapper 设备（不作为可写 by-name 对象）：\n${mapped.take(2048)}"
         if (partitions.isEmpty()) diagnostics += "没有可验证的 by-name 块设备；已限制探测范围为 /dev/block 的常见目录，未扫描整个文件系统"
-        diagnostics += "分区类型与状态仅供显示。写入在警告确认后直接执行 dd，无自动备份、兼容性检查或读回校验。RPMB 在内容探测前排除。"
+        diagnostics += "写入在警告确认后先强制完整备份并验证，再执行 dd、sync 和写入范围读回 SHA-256 检测。备份条件仍会拦截；不验证镜像兼容性。RPMB 在内容探测前排除。"
         return Discovery(partitions, environment(), diagnostics.joinToString("\n"))
     }
     suspend fun inspect(alias: String): Partition {

@@ -67,11 +67,13 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
         }
         if (home.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取分区表") }
         home.error?.let { WarningCard(it) }
-        if (settings.verbose) Text(home.diagnostics, style = MaterialTheme.typography.bodySmall)
+        if (settings.verbose && home.root == RootState.READY && !home.loading && home.diagnostics.isNotBlank())
+            Text(home.diagnostics, style = MaterialTheme.typography.bodySmall)
         } }
         if (home.root != RootState.READY) {
             item(key = "authorization-help") { Column {
-            Text(home.diagnostics, Modifier.padding(vertical = Spacing.medium))
+            if (!home.loading && home.diagnostics.isNotBlank())
+                Text(home.diagnostics, Modifier.padding(vertical = Spacing.medium))
             Text("授权前不执行 su。若授权超时请检查 Root 管理器；无 Root 时仍可查看设置与历史任务。")
             } }
         } else {
@@ -121,7 +123,7 @@ internal fun HomeScreen(vm: MainViewModel, home: HomeState, settings: AppSetting
             Text("容量：${p.bytes} 字节\n类型：${p.kind.label()}\n块设备：${p.device}\n设备号：${p.identity}\n槽位：${p.slot ?: "未知/非 A/B"}\n风险：${p.risk}\n挂载：${p.mounted}\n映射/持有者：${p.mapped}")
             Text("路径来源 / 重复别名：\n${p.aliases.joinToString("\n")}")
             Text("读取策略：${runCatching { SafetyPolicy.backup(p); "允许进入确认，执行前再次检查" }.exceptionOrNull()?.message ?: "允许进入确认"}")
-            Text("写入：选择文件并接受警告后直接执行 dd。无自动备份、风险检查、容量/格式检查或读回校验。此处信息仅供查看，不会阻止写入；请自行承担误写、数据丢失及无法启动风险。")
+            Text("写入：确认警告后先完整备份并验证；备份不满足读取策略或空间不足就停止。然后 dd、sync、按文件实际长度读回比对 SHA-256，不可跳过。不恢复格式/机型/AVB 等兼容性检查；哈希一致仍不保证可启动。")
         }
     }, confirmButton = { TextButton(onClick = { detail = null }) { Text("关闭") } }) }
 }

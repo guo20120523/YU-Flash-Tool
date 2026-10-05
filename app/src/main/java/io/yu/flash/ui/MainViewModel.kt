@@ -15,12 +15,17 @@ import kotlinx.coroutines.flow.*
 
 internal data class HomeState(val root: RootState = RootState.NOT_REQUESTED, val loading: Boolean = false,
     val partitions: List<Partition> = emptyList(), val environment: Environment? = null,
-    val diagnostics: String = "点击一键获取分区表", val error: String? = null)
+    val diagnostics: String = "", val error: String? = null)
 internal class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = (application as YuApplication).graph
     val home = MutableStateFlow(HomeState())
     val settings = graph.settings.flow.stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
     val events = graph.journal.events
+    val journalRefreshError = graph.journal.refreshError
+    fun reloadJournal() = viewModelScope.launch(Dispatchers.IO) {
+        try { graph.journal.reload() }
+        catch (_: Exception) { message.value = "日志列表刷新失败；不能据此判断任务或设备状态。" }
+    }
     val operation = graph.operations.flow
     val backupPrompt = MutableStateFlow<Pair<Partition, BackupLocation>?>(null)
     val message = MutableStateFlow<String?>(null)
@@ -28,7 +33,7 @@ internal class MainViewModel(application: Application) : AndroidViewModel(applic
         if (!accepted || operation.value.busy) return
         val image = operation.value.imported ?: return
         val target = operation.value.importTarget ?: return
-        start(Operation.Flash(DirectWriteRequest(target, image, acknowledged = true)))
+        start(Operation.Flash(DirectWriteRequest(target, image, acknowledged = true, backupPath = settings.value.backupPath)))
     }
     fun refresh() {
         if (home.value.loading || operation.value.busy) return

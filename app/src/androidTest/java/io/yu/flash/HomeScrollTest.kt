@@ -18,6 +18,28 @@ import org.junit.Test
 class HomeScrollTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
+    @Test fun initialVerboseHomeHasOnePartitionActionAndNoRepeatedPrompt() {
+        val vm = MainViewModel(compose.activity.application)
+        compose.setContent {
+            MaterialTheme { HomeScreen(vm, HomeState(), AppSettings(verbose = true), busy = false) }
+        }
+        compose.onAllNodesWithText("一键获取分区表", substring = true).assertCountEquals(1)
+        compose.onAllNodesWithText("点击一键获取分区表").assertCountEquals(0)
+        compose.onAllNodesWithText("正在读取分区表").assertCountEquals(0)
+    }
+
+    @Test fun loadingHomeHasOneStatusAndDoesNotRepeatDiagnostics() {
+        val vm = MainViewModel(compose.activity.application)
+        compose.setContent {
+            MaterialTheme {
+                HomeScreen(vm, HomeState(loading = true, diagnostics = "旧的诊断信息"), AppSettings(verbose = true), busy = false)
+            }
+        }
+        compose.onAllNodesWithText("正在读取分区表").assertCountEquals(1)
+        compose.onNodeWithText("一键获取分区表").assertIsNotEnabled()
+        compose.onAllNodesWithText("旧的诊断信息").assertCountEquals(0)
+    }
+
     @Test fun shortViewportCanReachPartitionsAndReturnToControls() {
         val vm = MainViewModel(compose.activity.application)
         val partitions = (0..29).map { index ->

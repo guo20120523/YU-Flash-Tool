@@ -95,8 +95,9 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
             title = { Text("警告与免责声明 · 直接 dd 写入") }, text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.small)) {
                     Text("目标：${operation.importTarget?.name}\n块设备：${operation.importTarget?.device}\n分区容量（上次发现）：${operation.importTarget?.bytes} 字节\n文件实际长度：${image.bytes} 字节")
-                    WarningCard("确认后直接执行 dd 覆盖目标，不会自动备份，也不检查文件格式、容量、挂载、动态分区、槽位、Bootloader、AVB、回滚、机型、电量或温度。可能立即造成数据丢失、无法启动或永久损坏。")
-                    Text("sparse、压缩包及未知文件也会原样写入，不会解压或转换；短文件会保留尾部旧数据，超长文件可能在部分写入后失败。没有读回校验或恢复保证。")
+                    Text("强制完整备份目录：${settings.backupPath}/YU-Flash-Tool/设备/时间-任务ID/\n写入前验证备份；写入后 sync 并读回文件实际长度范围，比对 SHA-256。两项均不可跳过。")
+                    WarningCard("完整备份失败就不会写入：目录、空间、目标身份、挂载/映射等备份条件仍会拦截。备份通过后执行 dd；不检查文件格式、镜像与分区大小兼容性、槽位、Bootloader、AVB、回滚、机型、电量或温度，仍可能导致数据丢失、无法启动或永久损坏。")
+                    Text("sparse、压缩包及未知文件原样写入，不解压或转换。短文件仅验证覆盖范围，不验证未覆盖的尾部；超长文件可能在部分写入后失败。下载目录备份可能含隐私数据；哈希一致不保证可恢复或断电持久性。")
                     Text("本程序按现状提供，不提供任何担保。请自行核对目标与文件并准备救援方式。免责声明不能消除风险；dd / sync 返回 0 也不代表可启动。不会自动重试、回滚、切槽或重启。停止应用或系统终止不能保证 dd 子进程停止。")
                     Row {
                         Checkbox(checked = accepted, onCheckedChange = { accepted = it })
@@ -107,7 +108,7 @@ internal fun YuApp(vm: MainViewModel, fold: FoldingFeature?) {
                 Button(enabled = accepted && !operation.busy, onClick = {
                     if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                     vm.confirmWrite(accepted)
-                }) { ButtonSymbol(Symbol.Upload); Text("确认并直接写入") }
+                }) { ButtonSymbol(Symbol.Upload); Text("备份后写入并验证") }
             }, dismissButton = { TextButton(onClick = vm::dismissImport) { Text("取消，不写入") } })
     }
 }
